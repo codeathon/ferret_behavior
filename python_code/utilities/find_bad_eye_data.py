@@ -4,6 +4,9 @@ from pathlib import Path
 from time import perf_counter
 
 from python_code.utilities.get_mean_dlc_confidence import get_mean_dlc_confidence
+from python_code.utilities.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 # def check_single_row(row, vertical_threshold: float, analysis_df: pd.DataFrame) -> int:
 #     camera = row["camera"]
@@ -39,7 +42,7 @@ def check_single_eye(camera: str, frame: int, vertical_threshold: float, analysi
     filtered_rows = analysis_df[analysis_df["frame"] == frame]
     
     if len(filtered_rows) == 0:
-        print(f"Warning: no rows remaining after filtering for frame {frame} camera {camera}")
+        logger.warning("No rows remaining after filtering for frame %d camera %s", frame, camera)
         return 0
         
     # Get keypoints efficiently
@@ -132,9 +135,9 @@ def bad_eye_data(recording_folder: Path):
     updated_df = find_bad_eye_data(confidence_df=dlc_confidence_df, analysis_df=eye_analysis_df)
     end_time = perf_counter()
     updated_df.to_csv(dlc_confidence_csv, index=False)
-    print(f"Searching for eye data took {end_time - start_time} s")
+    logger.info("Searching for eye data took %.3f s", end_time - start_time)
     percent_zeros = (updated_df['good_data'] == 0).mean() * 100
-    print(f"Percent of bad data found was {percent_zeros:.2f}%")
+    logger.info("Percent of bad data found: %.2f%%", percent_zeros)
 
 if __name__=='__main__':
     recording_folder = Path("/home/scholl-lab/ferret_recordings/session_2025-07-11_ferret_757_EyeCamera_P43_E15__1/clips/0m_37s-1m_37s")

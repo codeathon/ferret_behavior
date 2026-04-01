@@ -3,6 +3,10 @@ import cv2
 from pathlib import Path
 from typing import List
 
+from python_code.utilities.logging_config import get_logger
+
+logger = get_logger(__name__)
+
 
 def find_mp4_files(folder_path: str) -> List[Path]:
     """Find all MP4 files in the specified folder and its subfolders."""
@@ -16,7 +20,7 @@ def clip_video(video_path: Path, output_path: Path, start_frame: int, end_frame:
         # Open the video file
         cap = cv2.VideoCapture(str(video_path))
         if not cap.isOpened():
-            print(f"Error: Could not open video {video_path}")
+            logger.error("Could not open video %s", video_path)
             return False
 
         # Get video properties
@@ -27,7 +31,7 @@ def clip_video(video_path: Path, output_path: Path, start_frame: int, end_frame:
 
         # Validate frame range
         if start_frame < 0 or end_frame >= total_frames or start_frame > end_frame:
-            print(f"Error: Invalid frame range ({start_frame}-{end_frame}) for video with {total_frames} frames")
+            logger.error("Invalid frame range (%d-%d) for video with %d frames", start_frame, end_frame, total_frames)
             cap.release()
             return False
 
@@ -57,11 +61,11 @@ def clip_video(video_path: Path, output_path: Path, start_frame: int, end_frame:
         cap.release()
         out.release()
         
-        print(f"Successfully clipped {video_path.name} to {output_path}")
+        logger.info("Clipped %s → %s", video_path.name, output_path)
         return True
         
     except Exception as e:
-        print(f"Error processing {video_path}: {e}")
+        logger.error("Error processing %s: %s", video_path, e)
         return False
 
 
@@ -79,10 +83,10 @@ if __name__ == "__main__":
 
 
     if END_FRAME < START_FRAME:
-        print("Error: END_FRAME must be greater than or equal to START_FRAME")
+        logger.error("END_FRAME must be >= START_FRAME")
         raise ValueError("END_FRAME must be greater than or equal to START_FRAME")
     if not os.path.exists(INPUT_FOLDER):
-        print(f"Error: Input folder {INPUT_FOLDER} does not exist")
+        logger.error("Input folder does not exist: %s", INPUT_FOLDER)
         raise FileNotFoundError(f"Input folder {INPUT_FOLDER} does not exist")
     
     
@@ -90,14 +94,14 @@ if __name__ == "__main__":
     mp4_files = find_mp4_files(INPUT_FOLDER)
     
     if not mp4_files:
-        print(f"No MP4 files found in {INPUT_FOLDER}")
+        logger.error("No MP4 files found in %s", INPUT_FOLDER)
         raise FileNotFoundError(f"No MP4 files found in {INPUT_FOLDER}")
 
     # Create output directory if it doesn't exist
     output_dir = Path(OUTPUT_FOLDER)
     output_dir.mkdir(exist_ok=True, parents=True)
     
-    print(f"Found {len(mp4_files)} MP4 files")
+    logger.info("Found %d MP4 files", len(mp4_files))
     
     # Process each video
     for video_path in mp4_files:
