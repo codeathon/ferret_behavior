@@ -1,5 +1,5 @@
 """
-Tests for python_code/kinematics_core/
+Tests for src/kinematics_core/
 
 This module tests the foundational kinematic data models used throughout the
 pipeline. Coverage includes:
@@ -19,16 +19,16 @@ import math
 import numpy as np
 import pytest
 
-from python_code.kinematics_core.quaternion_model import Quaternion, resample_quaternions
-from python_code.kinematics_core.rigid_body_kinematics_model import RigidBodyKinematics
-from python_code.kinematics_core.reference_geometry_model import (
+from src.kinematics_core.quaternion_model import Quaternion, resample_quaternions
+from src.kinematics_core.rigid_body_kinematics_model import RigidBodyKinematics
+from src.kinematics_core.reference_geometry_model import (
     AxisDefinition,
     AxisType,
     CoordinateFrameDefinition,
     MarkerPosition,
     ReferenceGeometry,
 )
-from python_code.kinematics_core.kinematics_serialization import save_kinematics, load_kinematics
+from src.kinematics_core.kinematics_serialization import save_kinematics, load_kinematics
 
 
 # =============================================================================

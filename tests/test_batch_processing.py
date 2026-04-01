@@ -1,5 +1,5 @@
 """
-Tests for python_code/batch_processing/
+Tests for src/batch_processing/
 
 This module tests the orchestration logic in full_pipeline.py and
 postprocess_recording.py without executing any real computation or
@@ -27,7 +27,7 @@ import pytest
 from pathlib import Path
 from unittest.mock import patch, MagicMock, call
 
-from python_code.batch_processing.full_pipeline import (
+from src.batch_processing.full_pipeline import (
     _dlc_metadata_is_outdated,
     full_pipeline,
     HEAD_DLC_ITERATION,
@@ -87,12 +87,12 @@ class TestOverwriteFlagCascade:
         return rf
 
     def _run_pipeline_with_flags(self, tmp_path, mock_rf, **overwrite_flags):
-        with patch("python_code.batch_processing.full_pipeline.RecordingFolder.from_folder_path", return_value=mock_rf), \
-             patch("python_code.batch_processing.full_pipeline.postprocess") as mock_sync, \
-             patch("python_code.batch_processing.full_pipeline.run_calibration_subprocess") as mock_cal, \
-             patch("python_code.batch_processing.full_pipeline.run_skellyclicker_subprocess") as mock_dlc, \
-             patch("python_code.batch_processing.full_pipeline.run_triangulation_subprocess") as mock_tri, \
-             patch("python_code.batch_processing.full_pipeline.process_recording") as mock_post:
+        with patch("src.batch_processing.full_pipeline.RecordingFolder.from_folder_path", return_value=mock_rf), \
+             patch("src.batch_processing.full_pipeline.postprocess") as mock_sync, \
+             patch("src.batch_processing.full_pipeline.run_calibration_subprocess") as mock_cal, \
+             patch("src.batch_processing.full_pipeline.run_skellyclicker_subprocess") as mock_dlc, \
+             patch("src.batch_processing.full_pipeline.run_triangulation_subprocess") as mock_tri, \
+             patch("src.batch_processing.full_pipeline.process_recording") as mock_post:
             full_pipeline(tmp_path, **overwrite_flags)
             return mock_sync, mock_cal, mock_dlc, mock_tri, mock_post
 

@@ -1,5 +1,5 @@
 """
-Tests for python_code/rigid_body_solver/
+Tests for src/rigid_body_solver/
 
 This module tests the rigid body solver layer including:
 
@@ -20,9 +20,9 @@ import json
 import pytest
 from pathlib import Path
 
-from python_code.batch_processing.full_pipeline import _dlc_metadata_is_outdated
-from python_code.rigid_body_solver.core.main_solver_interface import RigidBodySolverConfig
-from python_code.rigid_body_solver.ferret_skull_solver import (
+from src.batch_processing.full_pipeline import _dlc_metadata_is_outdated
+from src.rigid_body_solver.core.main_solver_interface import RigidBodySolverConfig
+from src.rigid_body_solver.ferret_skull_solver import (
     create_skull_topology,
     create_skull_and_spine_topology,
 )

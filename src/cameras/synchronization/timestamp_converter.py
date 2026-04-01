@@ -1,0 +1,258 @@
+
+import json
+from pathlib import Path
+from typing import Dict, List, Tuple
+
+import cv2
+import numpy as np
+
+from src.utilities.logging_config import get_logger
+
+logger = get_logger(__name__)
+
+
+class TimestampConverter:
+    def __init__(self, folder_path: Path, include_eyes: bool = True):
+        if not isinstance(folder_path, Path):
+            folder_path = Path(folder_path)
+        if not folder_path.exists:
+            raise FileNotFoundError("Input folder path does not exist")
+
+        self.raw_videos_path = folder_path / "raw_videos"
+        self.synched_videos_path = folder_path / "synchronized_corrected_videos"
+        if not self.synched_videos_path.exists():
+            self.synched_videos_path = folder_path / "synchronized_videos"
+
+        self.basler_timestamp_mapping_file_name = "timestamp_mapping.json"
+        basler_timestamp_mapping_file = (
+                self.raw_videos_path / self.basler_timestamp_mapping_file_name
+        )
+        with open(basler_timestamp_mapping_file) as basler_timestamp_mapping_file:
+            self.basler_timestamp_mapping = json.load(basler_timestamp_mapping_file)
+
+        if include_eyes:
+            self.pupil_path = folder_path / "pupil_output"
+            self.pupil_eye0_video_path = self.pupil_path / "eye0.mp4"
+            self.pupil_eye1_video_path = self.pupil_path / "eye1.mp4"
+            self.pupil_world_video_path = self.pupil_path / "world.mp4"
+            self.include_pupil_world = True if self.pupil_world_video_path.exists() else False
+
+            self.pupil_timestamp_mapping_file_name = "info.player.json"
+            pupil_timestamp_mapping_file = (
+                    self.pupil_path / self.pupil_timestamp_mapping_file_name
+            )
+            with open(pupil_timestamp_mapping_file) as pupil_timestamp_mapping_file:
+                self.pupil_timestamp_mapping = json.load(pupil_timestamp_mapping_file)
+
+        self.synchronization_metadata = {}
+
+        if include_eyes:
+            self.load_and_convert_pupil_timestamps()
+        self.load_and_convert_basler_timestamps()
+        self.load_index_to_serial_number()
+        self.verify_index_to_serial_number()
+
+    def seconds_to_nanoseconds(self, seconds: float) -> int:
+        return int(seconds * 1e9)
+
+    def nanoseconds_to_seconds(self, nanoseconds: int) -> float:
+        return nanoseconds / 1e9
+
+    @property
+    def pupil_start_time(self) -> int:
+        return self.seconds_to_nanoseconds(
+            self.pupil_timestamp_mapping["start_time_synced_s"]
+        )
+
+    @property
+    def pupil_start_time_utc(self) -> int:
+        return self.seconds_to_nanoseconds(
+            self.pupil_timestamp_mapping["start_time_system_s"]
+        )
+
+    @property
+    def basler_start_time(self) -> int:
+        return self.basler_timestamp_mapping["starting_mapping"]["perf_counter_ns"]
+
+    @property
+    def basler_start_time_utc_ns(self) -> int:
+        return self.basler_timestamp_mapping["starting_mapping"]["utc_time_ns"]
+
+    @property
+    def difference_in_start_times(self) -> int:
+        return self.basler_start_time_utc_ns - self.pupil_start_time_utc
+
+    @property
+    def basler_camera_names(self) -> List[str]:
+        return list(
+            self.basler_timestamp_mapping["starting_mapping"][
+                "camera_timestamps"
+            ].keys()
+        )
+
+    def load_and_convert_pupil_timestamps(self):
+        """
+        Load pupil timestamps and convert to utc
+        conversion method based on: https://github.com/pupil-labs/pupil/issues/1500#issuecomment-492067526
+        """
+        offset = self.pupil_start_time_utc - self.pupil_start_time
+
+        pupil_eye0_timestamps_path = self.pupil_path / "eye0_timestamps.npy"
+        pupil_eye0_timestamps = np.load(pupil_eye0_timestamps_path)
+        pupil_eye0_timestamps *= 1e9  # convert to ns
+        pupil_eye0_timestamps = pupil_eye0_timestamps.astype(int)  # cast to int
+        self.pupil_eye0_timestamps_utc = (
+            pupil_eye0_timestamps + offset
+        )
+
+        pupil_eye1_timestamps_path = self.pupil_path / "eye1_timestamps.npy"
+        pupil_eye1_timestamps = np.load(pupil_eye1_timestamps_path)
+        pupil_eye1_timestamps *= 1e9  # convert to ns
+        pupil_eye1_timestamps = pupil_eye1_timestamps.astype(int)  # cast to int
+        self.pupil_eye1_timestamps_utc = (
+            pupil_eye1_timestamps + offset
+        )
+
+        pupil_world_timestamps_path = self.pupil_path / "world_timestamps.npy"
+        if not pupil_world_timestamps_path.exists():
+            logger.warning("World timestamps not found at %s — skipping", pupil_world_timestamps_path)
+            self.include_pupil_world = False
+        if self.include_pupil_world:
+            pupil_world_timestamps = np.load(pupil_world_timestamps_path)
+            pupil_world_timestamps *= 1e9  # convert to ns
+            pupil_world_timestamps = pupil_world_timestamps.astype(int)  # cast to int
+            self.pupil_world_timestamps_utc = (
+                pupil_world_timestamps + offset
+            )
+
+    def load_and_convert_basler_timestamps(self):
+        """
+        Load basler timestamps and convert to utc
+        Basler timestamps are saved in ns since camera latch time, which is roughly equivalent to time since utc start
+        """
+        timestamp_paths = list(self.synched_videos_path.glob("*_synchronized_timestamps_basler_time.npy"))
+        logger.debug("Timestamp paths: %s", timestamp_paths)
+
+        self.synched_basler_timestamps = {}
+        for timestamp_path in timestamp_paths:
+            cam_name = timestamp_path.stem.split("_")[0]
+            timestamp_array = np.load(timestamp_path)
+            self.synched_basler_timestamps[cam_name] = timestamp_array
+        # print(f"Raw timestamp array: {timestamp_array}")
+        self.synched_basler_timestamps_utc = {
+            cam_name: timestamps + self.basler_start_time_utc_ns 
+            for cam_name, timestamps  in self.synched_basler_timestamps.items()
+        }
+        # print(f"synched timestamp array: {self.synched_basler_timestamps_utc}")
+
+    def load_index_to_serial_number(self):
+        index_to_serial_number_path = (
+                self.raw_videos_path / "index_to_serial_number_mapping.json"
+        )
+        if not index_to_serial_number_path.exists():
+            logger.warning("index_to_serial_number_mapping.json not found at %s — using default mapping", index_to_serial_number_path)
+            logger.warning("Verify default mapping correctness before proceeding")
+            self.index_to_serial_number = {
+                "0": "24908831",
+                "1": "24908832",
+                "2": "25000609",
+                "3": "25006505"
+            }
+        else:
+            with open(index_to_serial_number_path) as index_to_serial_number_file:
+                self.index_to_serial_number = json.load(index_to_serial_number_file)
+
+        self.synchronization_metadata["index_to_serial_number_mapping"] = self.index_to_serial_number
+
+    def verify_index_to_serial_number(self):
+        logger.debug("Index-to-serial mapping (smaller serial numbers come first):")
+        for cam_name in self.basler_camera_names:
+            logger.debug("  cam %s serial: %s", cam_name, self.index_to_serial_number[cam_name])
+    
+    def get_closest_pupil_frame_to_basler_frame(self, basler_frame_number: int) -> tuple[int, int, int | None]:
+        basler_utc = np.median(self.synched_basler_timestamps_utc[:, basler_frame_number])
+        logger.debug("Basler UTC reference: %s", basler_utc)
+        eye0_match = np.searchsorted(self.pupil_eye0_timestamps_utc, basler_utc, side="right")
+        if (basler_utc - self.pupil_eye0_timestamps_utc[eye0_match-1]) < abs(basler_utc - self.pupil_eye0_timestamps_utc[eye0_match]):
+            eye0_frame_number = eye0_match-1
+        else: 
+            eye0_frame_number = eye0_match
+
+        eye1_match = np.searchsorted(self.pupil_eye0_timestamps_utc, basler_utc, side="right")
+        if (basler_utc - self.pupil_eye1_timestamps_utc[eye1_match-1]) < abs(basler_utc - self.pupil_eye1_timestamps_utc[eye1_match]):
+            eye1_frame_number = eye1_match-1
+        else: 
+            eye1_frame_number = eye1_match
+
+        if self.include_pupil_world:
+            eye_world_match = np.searchsorted(self.pupil_world_timestamps_utc, basler_utc, side="right")
+            if (basler_utc - self.pupil_world_timestamps_utc[eye_world_match-1]) < abs(basler_utc - self.pupil_world_timestamps_utc[eye_world_match]):
+                eye_world_frame_number = eye_world_match-1
+            else: 
+                eye_world_frame_number = eye_world_match
+            logger.debug("World match: frame %d at utc %s", eye_world_frame_number, self.pupil_world_timestamps_utc[eye_world_frame_number])
+        else:
+            eye_world_frame_number = None
+
+        logger.debug("Eye 0 match: frame %d at utc %s", eye0_frame_number, self.pupil_eye0_timestamps_utc[eye0_frame_number])
+        logger.debug("Eye 1 match: frame %d at utc %s", eye1_frame_number, self.pupil_eye1_timestamps_utc[eye1_frame_number])
+
+        return eye0_frame_number, eye1_frame_number, eye_world_frame_number
+
+    def save_basler_utc_timestamps(self):
+        logger.info("Saving Basler UTC timestamps to %s", self.synched_videos_path)
+        for cam_name, timestamps in self.synched_basler_timestamps_utc.items():
+            file_name = f"{cam_name}_synchronized_timestamps_utc.npy"
+            np.save(self.synched_videos_path / file_name, timestamps)
+
+    def save_pupil_utc_timestamps(self):
+        logger.info("Saving Pupil UTC timestamps to %s", self.pupil_path)
+        np.save(self.pupil_path / "eye0_timestamps_utc.npy", self.pupil_eye0_timestamps_utc)
+        np.save(self.pupil_path / "eye1_timestamps_utc.npy", self.pupil_eye1_timestamps_utc)
+        if self.include_pupil_world:
+            np.save(self.pupil_path / "world_timestamps_utc.npy", self.pupil_world_timestamps_utc)
+
+
+
+
+if __name__ == "__main__":
+    folder_path = Path(
+        "/home/scholl-lab/ferret_recordings/session_2025-07-01_ferret_757_EyeCameras_P33_EO5/base_data"
+    )
+    timestamp_converter = TimestampConverter(folder_path)
+
+    utc_start_time_pupil = timestamp_converter.pupil_start_time_utc
+    utc_start_time_basler = timestamp_converter.basler_start_time_utc_ns
+
+    basler_start_timestamps = list(float(timestamps[0]) for timestamps in timestamp_converter.synched_basler_timestamps.values())
+
+    logger.info("First Basler timestamps: %s", basler_start_timestamps)
+    logger.info("Basler start time spread (ns): %d", max(basler_start_timestamps) - min(basler_start_timestamps))
+
+    basler_start_discrepancy = {cam: timestamps[0] - utc_start_time_basler for cam, timestamps in timestamp_converter.synched_basler_timestamps_utc.items()}
+    logger.info("Basler first start vs timestamp mapping creation:")
+    for cam, time_offset in basler_start_discrepancy.items():
+        logger.info("  cam %s delay: %d ns", cam, time_offset)
+
+    logger.info("Pupil start (pupil ns): %d", timestamp_converter.pupil_start_time)
+    logger.info("Pupil start (pupil s): %.6f", timestamp_converter.nanoseconds_to_seconds(timestamp_converter.pupil_start_time))
+    logger.info("Pupil start (utc ns): %d", utc_start_time_pupil)
+    logger.info("Pupil start (utc s): %.6f", timestamp_converter.nanoseconds_to_seconds(utc_start_time_pupil))
+    logger.info("Basler start (utc ns): %d", utc_start_time_basler)
+    logger.info("Basler start (utc s): %.6f", timestamp_converter.nanoseconds_to_seconds(utc_start_time_basler))
+    logger.info("Basler start (Basler ns): %d", timestamp_converter.basler_start_time)
+    logger.info("Start time difference (basler - pupil) s: %.6f", timestamp_converter.difference_in_start_times / 1e9)
+    logger.info("Pupil start datetime: %s", np.datetime64(utc_start_time_pupil, 'ns'))
+    logger.info("Basler start datetime: %s", np.datetime64(utc_start_time_basler, 'ns'))
+    logger.info("Basler start times per camera: %s", timestamp_converter.basler_timestamp_mapping['starting_mapping']['camera_timestamps'])
+    logger.info("Pupil timestamp shapes — eye0: %s eye1: %s", timestamp_converter.pupil_eye0_timestamps_utc.shape, timestamp_converter.pupil_eye1_timestamps_utc.shape)
+    logger.debug("Pupil timestamps (eye0): %s", timestamp_converter.pupil_eye0_timestamps_utc)
+    logger.debug("Pupil timestamps (eye1): %s", timestamp_converter.pupil_eye1_timestamps_utc)
+    first_basler_timestamps = {cam: int(timestamps[0]) for cam, timestamps in timestamp_converter.synched_basler_timestamps_utc.items()}
+    logger.debug("Basler first timestamps utc (ns): %s", first_basler_timestamps)
+
+    # utc_timestamps.get_closest_pupil_frame_to_basler_frame(3377)
+    # utc_timestamps.get_closest_pupil_frame_to_basler_frame(8754)
+
+    timestamp_converter.save_basler_utc_timestamps()
+    timestamp_converter.save_pupil_utc_timestamps()

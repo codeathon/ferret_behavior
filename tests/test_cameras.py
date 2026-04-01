@@ -1,5 +1,5 @@
 """
-Unit tests for the refactored python_code/cameras package.
+Unit tests for the refactored src/cameras package.
 
 Covers the five focused sub-modules introduced during the camera_restructure:
     camera_config   — CameraProfile, CAMERAS, derived constants, helper functions
@@ -44,7 +44,7 @@ sys.modules.setdefault("pypylon", types.ModuleType("pypylon"))
 sys.modules.setdefault("pypylon.pylon", _pylon_stub)
 
 # Now safe to import camera modules
-from python_code.cameras.camera_config import (  # noqa: E402
+from src.cameras.camera_config import (  # noqa: E402
     CAMERAS,
     CameraProfile,
     ImageShape,
@@ -57,8 +57,8 @@ from python_code.cameras.camera_config import (  # noqa: E402
     get_camera_profile,
     get_image_shape,
 )
-from python_code.utilities.logging_config import get_logger as get_camera_logger  # noqa: E402
-from python_code.cameras.timestamp_utils import (  # noqa: E402
+from src.utilities.logging_config import get_logger as get_camera_logger  # noqa: E402
+from src.cameras.timestamp_utils import (  # noqa: E402
     save_timestamps,
     trim_timestamp_zeros,
 )
@@ -336,7 +336,7 @@ class TestTrimTimestampZeros:
 
 class TestSaveTimestamps:
     def _make_mapping(self, camera_ids: list[int]):
-        from python_code.cameras.diagnostics.timestamp_mapping import TimestampMapping
+        from src.cameras.diagnostics.timestamp_mapping import TimestampMapping
         return TimestampMapping(camera_timestamps={i: i * 1000 for i in camera_ids})
 
     def test_saves_npy_file(self, tmp_path):
@@ -391,7 +391,7 @@ class TestSaveTimestamps:
 sys.modules.setdefault("cv2", MagicMock())
 sys.modules.setdefault("ffmpeg", MagicMock())
 
-from python_code.cameras.video_writers import VideoWriterManager  # noqa: E402
+from src.cameras.video_writers import VideoWriterManager  # noqa: E402
 
 
 class TestVideoWriterManagerGuards:
@@ -440,7 +440,7 @@ class TestVideoWriterManagerGuards:
 # grab_loops — pure logic
 # ===========================================================================
 
-from python_code.cameras.grab_loops import GrabLoopRunner  # noqa: E402
+from src.cameras.grab_loops import GrabLoopRunner  # noqa: E402
 
 
 class TestGrabLoopRunnerPureLogic:

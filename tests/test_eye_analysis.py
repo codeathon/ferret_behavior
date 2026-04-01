@@ -1,5 +1,5 @@
 """
-Tests for python_code/eye_analysis/
+Tests for src/eye_analysis/
 
 This module tests the eye analysis data models and CSV loading layer:
 
@@ -20,7 +20,7 @@ import pytest
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 
-from python_code.eye_analysis.data_models.eye_video_dataset import EyeVideoData, EyeType
+from src.eye_analysis.data_models.eye_video_dataset import EyeVideoData, EyeType
 
 
 # =============================================================================
@@ -79,14 +79,14 @@ class TestLoadTrajectoryDataset:
         path.write_text("\n".join(rows))
 
     def test_load_valid_csv_returns_dataset(self, tmp_path):
-        from python_code.eye_analysis.data_models.csv_io import load_trajectory_dataset
+        from src.eye_analysis.data_models.csv_io import load_trajectory_dataset
         csv_path = tmp_path / "eye0_dlc.csv"
         self._write_valid_dlc_csv(csv_path, n_frames=20)
         dataset = load_trajectory_dataset(csv_path)
         assert dataset is not None
 
     def test_nonexistent_file_raises(self, tmp_path):
-        from python_code.eye_analysis.data_models.csv_io import load_trajectory_dataset
+        from src.eye_analysis.data_models.csv_io import load_trajectory_dataset
         with pytest.raises(Exception):
             load_trajectory_dataset(tmp_path / "does_not_exist.csv")
 
@@ -98,7 +98,7 @@ class TestLoadTrajectoryDataset:
 class TestProcessEyeSession:
     def test_process_eye_session_calls_underlying_steps(self, tmp_path):
         """Verify process_eye_session_from_recording_folder calls alignment and video creation."""
-        from python_code.eye_analysis.process_eye_session import process_eye_session_from_recording_folder
+        from src.eye_analysis.process_eye_session import process_eye_session_from_recording_folder
 
         mock_rf = MagicMock()
         mock_rf.eye_dlc_output = tmp_path / "eye_dlc"
@@ -106,8 +106,8 @@ class TestProcessEyeSession:
         mock_rf.left_eye_name = "eye1"
         mock_rf.right_eye_name = "eye0"
 
-        with patch("python_code.eye_analysis.process_eye_session.eye_alignment_main") as mock_align, \
-             patch("python_code.eye_analysis.process_eye_session.create_stabilized_eye_videos") as mock_vids:
+        with patch("src.eye_analysis.process_eye_session.eye_alignment_main") as mock_align, \
+             patch("src.eye_analysis.process_eye_session.create_stabilized_eye_videos") as mock_vids:
             try:
                 process_eye_session_from_recording_folder(mock_rf)
             except Exception:
@@ -115,7 +115,7 @@ class TestProcessEyeSession:
 
     def test_process_eye_session_accepts_recording_folder_argument(self):
         """Verify the function signature accepts a recording_folder keyword arg."""
-        from python_code.eye_analysis.process_eye_session import process_eye_session_from_recording_folder
+        from src.eye_analysis.process_eye_session import process_eye_session_from_recording_folder
         import inspect
         sig = inspect.signature(process_eye_session_from_recording_folder)
         assert "recording_folder" in sig.parameters
