@@ -12,7 +12,10 @@ tests/
 ├── test_ferret_gaze.py         # ClipPaths derivation, pipeline skip/reprocess logic
 ├── test_batch_processing.py    # full_pipeline overwrite flag cascade, step skipping
 ├── test_eye_analysis.py        # EyeVideoData models, CSV loading, session processing
-└── test_utilities.py           # RecordingFolder construction, stage checks, PipelineStep enum
+├── test_utilities.py           # RecordingFolder construction, stage checks, PipelineStep enum
+└── test_cameras.py             # Camera module: CameraProfile/CAMERAS, logging_config,
+                                #   timestamp_utils, VideoWriterManager guards,
+                                #   GrabLoopRunner pure logic
 ```
 
 ## Setup
@@ -46,6 +49,7 @@ uv run pytest -v
 ### Run a single test file
 
 ```bash
+uv run pytest tests/test_cameras.py -v
 uv run pytest tests/test_kinematics_core.py -v
 ```
 
@@ -53,7 +57,7 @@ uv run pytest tests/test_kinematics_core.py -v
 
 ```bash
 uv run pytest tests/test_kinematics_core.py::TestQuaternion -v
-uv run pytest tests/test_kinematics_core.py::TestQuaternion::test_slerp_at_t0_returns_q0 -v
+uv run pytest tests/test_cameras.py::TestCAMERAS::test_all_known_serials_present -v
 ```
 
 ### Run with short traceback
@@ -72,6 +76,7 @@ uv run pytest -x
 
 ```bash
 uv run pytest -k "slerp or quaternion"
+uv run pytest -k "camera or timestamp"
 ```
 
 ## What is and is not tested
@@ -86,13 +91,14 @@ uv run pytest -k "slerp or quaternion"
 | `batch_processing` | Overwrite flag cascade, auto-forcing DLC reprocess on outdated iteration, per-step skip when already done |
 | `eye_analysis` | EyeType/EyeVideoData models, CSV load validation, function signature checks |
 | `utilities` | RecordingFolder construction, missing directory errors, eye assignment, all is_*/check_* methods, PipelineStep enum |
+| `cameras` | CameraProfile dataclass, CAMERAS single source of truth, derived constants (KNOWN_SERIALS, NO_BINNING_SERIALS), helper lookups, apply/configure camera settings, logging fallback, trim_timestamp_zeros, save_timestamps I/O, VideoWriterManager guard conditions, GrabLoopRunner seconds→frames math and drop-detection |
 
 ### Not tested
 
 - Rerun and Blender visualization scripts (no return values to assert on)
 - External subprocess tools (`skellyclicker`, `dlc_to_3d`, `freemocap`)
 - Full numerical correctness of the Ceres solver (requires hardware)
-- Camera acquisition hardware (pypylon, ffmpeg writers)
+- Live camera acquisition (actual pypylon grab loops, real ffmpeg pipes) — requires Basler hardware
 - `python_code/old/` — archived code
 
 ## Adding new tests
@@ -101,3 +107,4 @@ uv run pytest -k "slerp or quaternion"
 2. Add shared fixtures to `conftest.py`.
 3. Use `tmp_path` (built-in pytest fixture) for any filesystem operations.
 4. Mock external calls using `unittest.mock.patch` — never call real subprocesses in unit tests.
+5. For hardware-dependent modules (cameras), patch `pypylon.pylon` in `sys.modules` before importing the module under test.
