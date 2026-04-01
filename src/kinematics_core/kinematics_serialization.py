@@ -5,7 +5,7 @@ Outputs:
 - Reference geometry: JSON (via ReferenceGeometry.to_json_file)
 - Kinematics: Tidy-format CSV
 """
-import logging
+from src.utilities.logging_config import get_logger
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -18,7 +18,7 @@ from src.kinematics_core.reference_geometry_model import ReferenceGeometry
 if TYPE_CHECKING:
     from src.kinematics_core.rigid_body_kinematics_model import RigidBodyKinematics
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 def kinematics_to_tidy_dataframe(
