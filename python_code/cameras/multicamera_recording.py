@@ -4,7 +4,7 @@ MultiCameraRecording — orchestrator for Basler multi-camera acquisition.
 This class is the single public entry point for recording code. It owns the
 camera array and wires together the focused subsystems:
 
-    camera_config   — per-serial image shapes and camera settings
+    camera_config   — CameraProfile, CAMERAS, KNOWN_SERIALS, and derived helpers
     video_writers   — VideoWriterManager (OpenCV or ffmpeg backends)
     timestamp_utils — hardware timestamp latching and saving
     grab_loops      — GrabLoopRunner (frame retrieval loop)
@@ -24,8 +24,8 @@ import pypylon.pylon as pylon
 
 from python_code.cameras.camera_config import (
     ImageShape,
+    KNOWN_SERIALS,
     NO_BINNING_SERIALS,
-    SERIAL_TO_IMAGE_SHAPE,
     get_image_shape,
 )
 from python_code.cameras.grab_loops import GrabLoopRunner
@@ -78,8 +78,7 @@ class MultiCameraRecording:
 
         all_devices = list(self.tlf.EnumerateDevices())
         nir_devices = [d for d in all_devices if "NIR" in d.GetModelName()]
-        select_serials = {24908831, 24908832, 25000609, 25006505, 24676894, 24678651}
-        select_devices = [d for d in all_devices if int(d.GetSerialNumber()) in select_serials]
+        select_devices = [d for d in all_devices if d.GetSerialNumber() in KNOWN_SERIALS]
 
         self.devices = nir_devices if nir_only else select_devices
         self.camera_array = self._create_camera_array()
