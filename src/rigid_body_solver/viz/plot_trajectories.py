@@ -1,12 +1,12 @@
 """Visualization utilities for rigid body solver results."""
 
-import logging
+from src.utilities.logging_config import get_logger
 from pathlib import Path
 
 import matplotlib.pyplot as plt
 import pandas as pd
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 def plot_origin_trajectories(df: pd.DataFrame) -> None:

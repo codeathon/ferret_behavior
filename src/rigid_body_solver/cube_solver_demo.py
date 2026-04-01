@@ -2,7 +2,7 @@
 
 from pathlib import Path
 import numpy as np
-import logging
+from src.utilities.logging_config import get_logger
 from scipy.spatial.transform import Rotation
 
 from src.kinematics_core.stick_figure_topology_model import StickFigureTopology
@@ -10,7 +10,7 @@ from src.rigid_body_solver.core.optimization import OptimizationConfig
 from src.rigid_body_solver.core import TrackingConfig, process_tracking_data
 from src.rigid_body_solver.data_io.data_savers import save_simple_csv
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 def rotation_matrix_from_axis_angle(*, axis: np.ndarray, angle: float) -> np.ndarray:

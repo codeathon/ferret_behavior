@@ -3,9 +3,9 @@
 from pathlib import Path
 import csv
 import numpy as np
-import logging
+from src.utilities.logging_config import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 def load_measured_trajectories_csv(

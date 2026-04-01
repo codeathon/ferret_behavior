@@ -3,7 +3,7 @@
 Updated to use Pydantic v2 models and the new kinematics_core.
 """
 
-import logging
+from src.utilities.logging_config import get_logger
 from copy import deepcopy
 from itertools import combinations
 from pathlib import Path
@@ -21,7 +21,7 @@ from src.rigid_body_solver.data_io.load_measured_trajectories import  load_measu
 from src.rigid_body_solver.viz.ferret_skull_rerun import run_ferret_skull_and_spine_visualization
 from src.utilities.folder_utilities.recording_folder import RecordingFolder
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 def create_skull_topology() -> StickFigureTopology:

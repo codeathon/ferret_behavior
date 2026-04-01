@@ -1,6 +1,6 @@
 """Main interface for rigid body tracking pipeline using Pydantic v2."""
 
-import logging
+from src.utilities.logging_config import get_logger
 from pathlib import Path
 from typing import Literal
 
@@ -14,7 +14,7 @@ from src.rigid_body_solver.core.optimization import OptimizationConfig, Optimiza
 from src.kinematics_core.stick_figure_topology_model import StickFigureTopology
 from src.rigid_body_solver.data_io.load_measured_trajectories import load_measured_trajectories_csv
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class RigidBodySolverConfig(BaseModel):
