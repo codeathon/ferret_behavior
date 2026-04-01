@@ -7,7 +7,7 @@ Each output video frame shows the closest frame from the original video,
 with the original frame number drawn as a label.
 """
 
-import logging
+from src.utilities.logging_config import get_logger
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -16,7 +16,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 @dataclass

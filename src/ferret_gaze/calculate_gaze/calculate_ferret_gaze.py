@@ -17,7 +17,7 @@ The script transforms eye-in-head rotations to gaze-in-world by:
 1. Mounting the eye in a socket frame aligned with the skull
 2. Applying the skull's world transform to get world coordinates
 """
-import logging
+from src.utilities.logging_config import get_logger
 from pathlib import Path
 from typing import Literal
 
@@ -40,7 +40,7 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(levelname)s | %(message)s",
 )
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 def quaternion_from_rotation_matrix(R: NDArray[np.float64]) -> NDArray[np.float64]:

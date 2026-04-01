@@ -8,7 +8,7 @@ resamples all to common timestamps, and saves the results.
 All output files will have EXACTLY the same number of frames and identical timestamps.
 Videos are resampled to the 'display_videos' folder at the same level as the output directory.
 """
-import logging
+from src.utilities.logging_config import get_logger
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
@@ -28,7 +28,7 @@ from src.ferret_gaze.eye_kinematics.ferret_eyeball_reference_geometry import NUM
 from src.kinematics_core.rigid_body_kinematics_model import RigidBodyKinematics
 from src.kinematics_core.stick_figure_topology_model import StickFigureTopology
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 # =============================================================================
