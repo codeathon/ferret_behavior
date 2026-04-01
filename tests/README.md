@@ -13,7 +13,7 @@ tests/
 ├── test_batch_processing.py    # full_pipeline overwrite flag cascade, step skipping
 ├── test_eye_analysis.py        # EyeVideoData models, CSV loading, session processing
 ├── test_utilities.py           # RecordingFolder construction, stage checks, PipelineStep enum
-└── test_cameras.py             # Camera module: CameraProfile/CAMERAS, logging_config,
+└── test_cameras.py             # Camera module: CameraProfile/CAMERAS, shared get_logger,
                                 #   timestamp_utils, VideoWriterManager guards,
                                 #   GrabLoopRunner pure logic
 ```
@@ -91,7 +91,7 @@ uv run pytest -k "camera or timestamp"
 | `batch_processing` | Overwrite flag cascade, auto-forcing DLC reprocess on outdated iteration, per-step skip when already done |
 | `eye_analysis` | EyeType/EyeVideoData models, CSV load validation, function signature checks |
 | `utilities` | RecordingFolder construction, missing directory errors, eye assignment, all is_*/check_* methods, PipelineStep enum |
-| `cameras` | CameraProfile dataclass, CAMERAS single source of truth, derived constants (KNOWN_SERIALS, NO_BINNING_SERIALS), helper lookups, apply/configure camera settings, logging fallback, trim_timestamp_zeros, save_timestamps I/O, VideoWriterManager guard conditions, GrabLoopRunner seconds→frames math and drop-detection |
+| `cameras` | CameraProfile dataclass, CAMERAS single source of truth, derived constants (KNOWN_SERIALS, NO_BINNING_SERIALS), helper lookups, apply/configure camera settings, shared `get_logger` fallback, trim_timestamp_zeros, save_timestamps I/O, VideoWriterManager guard conditions, GrabLoopRunner seconds→frames math and drop-detection |
 
 ### Not tested
 

@@ -14,7 +14,6 @@ After the `camera_restructure` refactor, the acquisition code is split across fo
 | `video_writers.py` | `VideoWriterManager` — ffmpeg and OpenCV writer backends, pipe tuning. |
 | `timestamp_utils.py` | `latch_timestamp_mapping()`, `trim_timestamp_zeros()`, `save_timestamps()`. |
 | `grab_loops.py` | `GrabLoopRunner` — frame retrieval loop and the three grab modes. |
-| `logging_config.py` | `get_camera_logger()` — file + console logger with graceful fallback. |
 | `postprocess.py` | Post-recording sync, file moves, and `combine_videos` call. |
 | `synchronization/` | Timestamp synchronization across Basler and Pupil streams. |
 | `intrinsics/` | Per-camera lens calibration and distortion correction. |

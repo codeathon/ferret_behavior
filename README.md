@@ -64,7 +64,7 @@ uv run python -c "import cv2, torch, pandas, rerun; print('OK')"
 | Module | Purpose |
 |---|---|
 | `src/kinematics_core/` | Shared Pydantic data models for poses, quaternions, trajectories, and reference geometry. Library only — no entry points. |
-| `src/cameras/` | Basler multicamera acquisition, UTC timestamp sync, Pupil alignment, intrinsics calibration, and session postprocessing. Internally split into focused modules: `camera_config.py` (hardware config), `video_writers.py` (ffmpeg/OpenCV writers), `timestamp_utils.py` (latch/save), `grab_loops.py` (frame loop), `logging_config.py` (configurable logger). Run a session via `run_recording.py`. |
+| `src/cameras/` | Basler multicamera acquisition, UTC timestamp sync, Pupil alignment, intrinsics calibration, and session postprocessing. Internally split into focused modules: `camera_config.py` (hardware config), `video_writers.py` (ffmpeg/OpenCV writers), `timestamp_utils.py` (latch/save), `grab_loops.py` (frame loop). Run a session via `run_recording.py`. |
 | `src/video_viewing/` | Composite multi-camera video assembly, session clipping, and rotation/flip layout config. |
 | `src/eye_analysis/` | DLC eye trajectory loading, anatomical alignment, stabilized video export, and Plotly dashboards. |
 | `src/rigid_body_solver/` | Ceres-based rigid body fitting to 3D markers; outputs skull kinematics and reference geometry JSON. |
