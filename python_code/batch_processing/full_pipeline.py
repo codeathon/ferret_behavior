@@ -35,6 +35,55 @@ def _dlc_metadata_is_outdated(dlc_output_folder: Path | None, required_iteration
     return metadata.get("iteration", 0) < required_iteration
 
 
+def _make_clean_env() -> dict:
+    """Return a copy of the environment with Python venv vars stripped out."""
+    env = os.environ.copy()
+    for key in ("PYTHONPATH", "PYTHONHOME", "VIRTUAL_ENV"):
+        env.pop(key, None)
+    return env
+
+
+def _spawn_pty_process(command_list: list, clean_env: dict) -> tuple:
+    """
+    Open a PTY, size it to match the parent terminal, and spawn the command.
+
+    Returns (process, master_fd) so the caller can drain output and close the fd.
+    Falls back silently if stdout is not a TTY when setting the window size.
+    """
+    import pty, fcntl, termios, struct
+    master_fd, slave_fd = pty.openpty()
+    # Match PTY window size to parent terminal so tqdm sizes its bar correctly.
+    try:
+        term_size = os.get_terminal_size(sys.stdout.fileno())
+        winsize = struct.pack("HHHH", term_size.lines, term_size.columns, 0, 0)
+        fcntl.ioctl(master_fd, termios.TIOCSWINSZ, winsize)
+    except OSError:
+        pass
+    process = subprocess.Popen(
+        command_list, env=clean_env,
+        stdout=slave_fd, stderr=slave_fd, stdin=subprocess.DEVNULL,
+    )
+    os.close(slave_fd)
+    return process, master_fd
+
+
+def _drain_pty_fd(master_fd: int) -> None:
+    """Stream all output from the PTY master fd to stdout until the child closes it."""
+    try:
+        while True:
+            try:
+                data = os.read(master_fd, 4096)
+                if not data:
+                    break
+                sys.stdout.buffer.write(data)
+                sys.stdout.flush()
+            except OSError:
+                # Raised when the slave end is closed (process exited)
+                break
+    finally:
+        os.close(master_fd)
+
+
 def _run_subprocess_streaming(command_list: list, clean_env: dict, use_pty: bool = False) -> None:
     """
     Run a subprocess and stream its output in real time, raising on non-zero exit.
@@ -42,54 +91,17 @@ def _run_subprocess_streaming(command_list: list, clean_env: dict, use_pty: bool
     Args:
         command_list: Command and arguments to run.
         clean_env: Environment dict for the subprocess.
-        use_pty: If True, allocate a pseudo-terminal so the child process believes
-                 it is writing to a real terminal.  This keeps tqdm and other
-                 progress-bar libraries in single-line overwrite mode (\\r) instead
-                 of printing every update as a new line.
+        use_pty: If True, allocate a PTY so tqdm stays in single-line overwrite
+                 mode instead of printing every update as a new line.
     """
     if use_pty and sys.platform != "win32":
-        import pty
-        import fcntl
-        import termios
-        import struct
-        master_fd, slave_fd = pty.openpty()
-        # Match the PTY window size to the parent terminal so tqdm sizes its
-        # bar correctly.  Falls back silently if stdout is not a TTY.
-        try:
-            term_size = os.get_terminal_size(sys.stdout.fileno())
-            winsize = struct.pack("HHHH", term_size.lines, term_size.columns, 0, 0)
-            fcntl.ioctl(master_fd, termios.TIOCSWINSZ, winsize)
-        except OSError:
-            pass
-        process = subprocess.Popen(
-            command_list,
-            env=clean_env,
-            stdout=slave_fd,
-            stderr=slave_fd,
-            stdin=subprocess.DEVNULL,
-        )
-        os.close(slave_fd)
-        try:
-            while True:
-                try:
-                    data = os.read(master_fd, 4096)
-                    if not data:
-                        break
-                    sys.stdout.buffer.write(data)
-                    sys.stdout.flush()
-                except OSError:
-                    # Raised when the slave end is closed (process exited)
-                    break
-        finally:
-            os.close(master_fd)
+        process, master_fd = _spawn_pty_process(command_list, clean_env)
+        _drain_pty_fd(master_fd)
     else:
         process = subprocess.Popen(
-            command_list,
-            env=clean_env,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            bufsize=1,
+            command_list, env=clean_env,
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            text=True, bufsize=1,
         )
         for line in process.stdout:
             sys.stdout.write(line)
@@ -104,17 +116,12 @@ def run_skellyclicker_subprocess(
         recording_folder_path: Path,
         venv_path: str = "/home/scholl-lab/anaconda3/envs/skellyclicker/bin/python",
         script_path: str = "/home/scholl-lab/skellyclicker/skellyclicker/scripts/process_recording.py",
-        include_eye: bool = True,):
-    clean_env = os.environ.copy()
-    clean_env.pop("PYTHONPATH", None)
-    clean_env.pop("PYTHONHOME", None)
-    clean_env.pop("VIRTUAL_ENV", None)
-
+        include_eye: bool = True,
+    ):
     command_list = [venv_path, "-u", script_path, recording_folder_path]
     if not include_eye:
         command_list.append("--skip-eye")
-
-    _run_subprocess_streaming(command_list, clean_env, use_pty=True)
+    _run_subprocess_streaming(command_list, _make_clean_env(), use_pty=True)
 
 
 def run_triangulation_subprocess(
@@ -122,18 +129,12 @@ def run_triangulation_subprocess(
         calibration_toml_path: Path,
         venv_path: str = "/home/scholl-lab/Documents/git_repos/dlc_to_3d/.venv/bin/python",
         script_path: str = "/home/scholl-lab/Documents/git_repos/dlc_to_3d/dlc_reconstruction/dlc_to_3d.py",
-        skip_toy: bool = False
+        skip_toy: bool = False,
     ):
-    clean_env = os.environ.copy()
-    clean_env.pop("PYTHONPATH", None)
-    clean_env.pop("PYTHONHOME", None)
-    clean_env.pop("VIRTUAL_ENV", None)
-
     command_list = [venv_path, script_path, recording_folder_path, calibration_toml_path]
     if skip_toy:
         command_list.append("--skip-toy")
-
-    _run_subprocess_streaming(command_list, clean_env)
+    _run_subprocess_streaming(command_list, _make_clean_env())
 
 
 def run_calibration_subprocess(
@@ -141,23 +142,83 @@ def run_calibration_subprocess(
         venv_path: str = "/home/scholl-lab/anaconda3/envs/fmc/bin/python",
         script_path: str = "/home/scholl-lab/Documents/git_repos/freemocap/experimental/batch_process/headless_calibration.py",
     ):
-    clean_env = os.environ.copy()
-    clean_env.pop("PYTHONPATH", None)
-    clean_env.pop("PYTHONHOME", None)
-    clean_env.pop("VIRTUAL_ENV", None)
-
     command_list = [
-        venv_path,
-        script_path,
-        calibration_videos_path,
-        "--square-size",
-        "57",
-        "--5x3",
-        "--use-groundplane"
+        venv_path, script_path, calibration_videos_path,
+        "--square-size", "57", "--5x3", "--use-groundplane",
     ]
+    _run_subprocess_streaming(command_list, _make_clean_env())
 
-    _run_subprocess_streaming(command_list, clean_env)
 
+
+def _resolve_overwrite_flags(
+    recording_folder: "RecordingFolder",
+    overwrite_synchronization: bool,
+    overwrite_calibration: bool,
+    overwrite_dlc: bool,
+    overwrite_triangulation: bool,
+    overwrite_eye_postprocessing: bool,
+    overwrite_skull_postprocessing: bool,
+    overwrite_gaze: bool,
+) -> dict:
+    """
+    Propagate overwrite flags through dependent pipeline steps and force DLC
+    reprocessing if any outputs were produced with an outdated model iteration.
+    Returns a dict of resolved flag values keyed by step name.
+    """
+    if not overwrite_dlc and (
+        _dlc_metadata_is_outdated(recording_folder.head_body_dlc_output, HEAD_DLC_ITERATION)
+        or _dlc_metadata_is_outdated(recording_folder.eye_dlc_output, EYE_DLC_ITERATION)
+        or _dlc_metadata_is_outdated(recording_folder.toy_dlc_output, TOY_DLC_ITERATION)
+    ):
+        print("DLC outputs are from an outdated model iteration, forcing DLC reprocessing")
+        overwrite_dlc = True
+
+    if overwrite_synchronization:
+        overwrite_calibration = True
+    if overwrite_dlc:
+        overwrite_eye_postprocessing = True
+        if overwrite_calibration:
+            overwrite_triangulation = True
+    if overwrite_triangulation:
+        overwrite_skull_postprocessing = True
+    if overwrite_eye_postprocessing or overwrite_skull_postprocessing:
+        overwrite_gaze = True
+
+    return dict(
+        synchronization=overwrite_synchronization,
+        calibration=overwrite_calibration,
+        dlc=overwrite_dlc,
+        triangulation=overwrite_triangulation,
+        eye_postprocessing=overwrite_eye_postprocessing,
+        skull_postprocessing=overwrite_skull_postprocessing,
+        gaze=overwrite_gaze,
+    )
+
+
+def _run_postprocessing(
+    recording_folder: "RecordingFolder",
+    recording_folder_path: Path,
+    include_eye: bool,
+    flags: dict,
+) -> None:
+    """Run eye/skull/gaze postprocessing steps that are flagged or not yet done."""
+    run_eye = include_eye and (flags["eye_postprocessing"] or not recording_folder.is_eye_postprocessed())
+    run_skull = flags["skull_postprocessing"] or not recording_folder.is_skull_postprocessed()
+    run_gaze = include_eye and (flags["gaze"] or not recording_folder.is_gaze_postprocessed())
+
+    if run_eye or run_skull or run_gaze:
+        print("Running gaze processing...")
+        process_recording(
+            recording_folder=recording_folder,
+            skip_eye=not run_eye,
+            skip_skull=not run_skull,
+            skip_gaze=not run_gaze,
+        )
+    recording_folder.check_eye_postprocessing()
+    recording_folder.check_skull_postprocessing()
+    recording_folder.check_gaze_postprocessing()
+    print("Gaze calculations complete")
+    print(f"Session processed: {recording_folder_path}")
 
 
 def full_pipeline(
@@ -170,87 +231,52 @@ def full_pipeline(
     overwrite_triangulation: bool = False,
     overwrite_eye_postprocessing: bool = False,
     overwrite_skull_postprocessing: bool = False,
-    overwrite_gaze: bool = False
+    overwrite_gaze: bool = False,
 ):
     recording_folder = RecordingFolder.from_folder_path(folder=recording_folder_path)
-
-    # Force DLC reprocessing if any output was generated with an outdated model iteration
-    if not overwrite_dlc and (
-        _dlc_metadata_is_outdated(recording_folder.head_body_dlc_output, HEAD_DLC_ITERATION)
-        or _dlc_metadata_is_outdated(recording_folder.eye_dlc_output, EYE_DLC_ITERATION)
-        or _dlc_metadata_is_outdated(recording_folder.toy_dlc_output, TOY_DLC_ITERATION)
-    ):
-        print("DLC outputs are from an outdated model iteration, forcing DLC reprocessing")
-        overwrite_dlc = True
-
-    # Propagate overwrite flags through dependent steps
-    if overwrite_synchronization:
-        overwrite_calibration = True
-
-    if overwrite_dlc:
-        overwrite_eye_postprocessing = True
-        if overwrite_calibration:
-            overwrite_triangulation = True
-
-    if overwrite_triangulation:
-        overwrite_skull_postprocessing = True
-
-    if overwrite_eye_postprocessing or overwrite_skull_postprocessing:
-        overwrite_gaze = True
+    flags = _resolve_overwrite_flags(
+        recording_folder,
+        overwrite_synchronization, overwrite_calibration, overwrite_dlc,
+        overwrite_triangulation, overwrite_eye_postprocessing,
+        overwrite_skull_postprocessing, overwrite_gaze,
+    )
 
     # Synchronization
-    if overwrite_synchronization or not recording_folder.is_synchronized():
+    if flags["synchronization"] or not recording_folder.is_synchronized():
         print(f"Synchronizing videos at {recording_folder.base_recordings_folder}")
         postprocess(session_folder_path=recording_folder.base_recordings_folder, include_eyes=include_eye)
     recording_folder.check_synchronization()
     print("Synchronizing videos completed")
 
     # Calibration
-    if overwrite_calibration or not recording_folder.is_calibrated():
+    if flags["calibration"] or not recording_folder.is_calibrated():
         print("Calibrating session...")
         run_calibration_subprocess(calibration_videos_path=recording_folder.calibration_videos)
     recording_folder.check_calibration()
     print("Calibration complete")
 
     # DLC
-    if overwrite_dlc or not recording_folder.is_dlc_processed():
+    if flags["dlc"] or not recording_folder.is_dlc_processed():
         print("Running pose estimation...")
         run_skellyclicker_subprocess(recording_folder_path=recording_folder_path)
     recording_folder.check_dlc_output()
     print("Pose estimation complete")
 
     # Triangulation
-    if overwrite_triangulation or not recording_folder.is_triangulated():
+    if flags["triangulation"] or not recording_folder.is_triangulated():
         if calibration_toml_path is None:
             calibration_toml_path = recording_folder.calibration_toml_path
         if calibration_toml_path is None:
             raise ValueError("No calibration toml file found, could not run triangulation")
         print("Running triangulation...")
-        run_triangulation_subprocess(recording_folder_path=recording_folder_path, calibration_toml_path=calibration_toml_path)
+        run_triangulation_subprocess(
+            recording_folder_path=recording_folder_path,
+            calibration_toml_path=calibration_toml_path,
+        )
     recording_folder.check_triangulation()
     print("Triangulation complete")
 
-    eye_postprocessing = recording_folder.is_eye_postprocessed()
-    skull_postprocessing = recording_folder.is_skull_postprocessed()
-    gaze_postprocessing = recording_folder.is_gaze_postprocessed()
-    
-
-    run_eye_postprocessing = include_eye and (overwrite_eye_postprocessing or not eye_postprocessing)
-    run_skull_postprocessing = overwrite_skull_postprocessing or not skull_postprocessing
-    run_gaze_postprocessing = include_eye and (overwrite_gaze or not gaze_postprocessing)
-    if run_eye_postprocessing or run_skull_postprocessing or run_gaze_postprocessing: 
-        print("Running gaze processing...")
-        process_recording(
-            recording_folder=recording_folder,
-            skip_eye=not run_eye_postprocessing,
-            skip_skull=not run_skull_postprocessing,
-            skip_gaze=not run_gaze_postprocessing
-        )
-    recording_folder.check_eye_postprocessing()
-    recording_folder.check_skull_postprocessing()
-    recording_folder.check_gaze_postprocessing()
-    print("Gaze calculations complete")
-    print(f"Session processed: {recording_folder_path}")
+    _run_postprocessing(recording_folder, recording_folder_path, include_eye, flags)
 
 
 if __name__=="__main__":
