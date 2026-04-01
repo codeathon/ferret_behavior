@@ -1,4 +1,3 @@
-import logging
 import time
 from pathlib import Path
 from typing import Dict, List, Optional, Union
@@ -7,7 +6,9 @@ import numpy as np
 from pydantic import BaseModel
 from scipy.stats import median_abs_deviation
 
-logger = logging.getLogger(__name__)
+from src.utilities.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 class TimestampDiagnosticsDataClass(BaseModel):
@@ -129,7 +130,7 @@ def calculate_camera_diagnostic_results(
         timestamps_formatted = (np.asarray(timestamps) - timestamps[0]) / 1e9
         frame_durations = np.diff(timestamps_formatted)
         if np.any(frame_durations == 0):
-            print(f"zeroes found in frame durations for camera {cam_id}, replacing with NaN")
+            logger.warning("zeroes found in frame durations for camera %s, replacing with NaN", cam_id)
             frame_durations = np.where(frame_durations == 0, np.nan, frame_durations)
         framerate_per_frame = 1 / frame_durations
         mean_framerates_per_camera[cam_id] = np.nanmean(framerate_per_frame)
