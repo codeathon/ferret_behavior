@@ -12,7 +12,7 @@ frame timestamps can be expressed relative to that reference point.
 """
 
 import json
-import logging
+from src.utilities.logging_config import get_logger
 import time
 from pathlib import Path
 
@@ -21,7 +21,7 @@ import pypylon.pylon as pylon
 
 from src.cameras.diagnostics.timestamp_mapping import TimestampMapping
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 def latch_timestamp_mapping(camera_array: pylon.InstantCameraArray) -> TimestampMapping:

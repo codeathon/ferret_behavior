@@ -1,7 +1,7 @@
 
 
 import csv
-import logging
+from src.utilities.logging_config import get_logger
 from pathlib import Path
 
 import numpy as np
@@ -10,7 +10,7 @@ from pydantic import BaseModel, ConfigDict
 from src.eye_analysis.data_models.abase_model import FrozenABaseModel
 from src.eye_analysis.data_models.trajectory_dataset import TrajectoryDataset
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class CSVFormatError(ValueError):

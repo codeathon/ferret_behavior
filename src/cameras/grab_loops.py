@@ -13,7 +13,7 @@ the camera-level helpers used inside the grab loop (_set_fps_during_grabbing,
 disable_throughput_limit).
 """
 
-import logging
+from src.utilities.logging_config import get_logger
 import threading
 import time
 from typing import Callable
@@ -24,7 +24,7 @@ import pypylon.pylon as pylon
 from src.cameras.timestamp_utils import latch_timestamp_mapping, save_timestamps
 from src.cameras.video_writers import VideoWriterManager
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # Pre-allocate this many frames when grab_until_input is used (~1 h at 90 fps).
 _OPEN_ENDED_MAX_FRAMES = 324_000

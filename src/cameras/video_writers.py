@@ -16,7 +16,7 @@ Usage:
 """
 
 import fcntl
-import logging
+from src.utilities.logging_config import get_logger
 from pathlib import Path
 from typing import Union
 
@@ -27,7 +27,7 @@ import pypylon.pylon as pylon
 
 from src.cameras.camera_config import ImageShape
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 FFMPEG_PIPE_SIZE = 200_000_000  # 200 MB pipe buffer
 

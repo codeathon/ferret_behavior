@@ -1,5 +1,5 @@
 import enum
-import logging
+from src.utilities.logging_config import get_logger
 from pathlib import Path
 
 import numpy as np
@@ -17,7 +17,7 @@ from src.eye_analysis.data_models.trajectory_dataset import (
     DEFAULT_BUTTERWORTH_ORDER,
 )
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class EyeType(enum.Enum):
