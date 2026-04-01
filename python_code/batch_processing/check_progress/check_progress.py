@@ -4,6 +4,9 @@ import pandas as pd
 from pathlib import Path
 
 from python_code.utilities.folder_utilities.recording_folder import RecordingFolder
+from python_code.utilities.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 _COLUMNS = [
@@ -82,7 +85,7 @@ if __name__ == "__main__":
     ferret_recordings_path = Path("/Users/philipqueen/Documents/GitHub/bs/ferret_recordings")
     # check if recording_progress.csv exists, if it does, load it and update it, if it doesn't, create it
     df = check_progress(ferret_recordings_path)
-    print(df)
+    logger.info("Recording progress:\n%s", df)
 
     #save df to csv
     df.to_csv(ferret_recordings_path / "recording_progress.csv", index=False)

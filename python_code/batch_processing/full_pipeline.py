@@ -16,6 +16,9 @@ import sys
 from python_code.batch_processing.postprocess_recording import process_recording
 from python_code.cameras.postprocess import postprocess
 from python_code.utilities.folder_utilities.recording_folder import RecordingFolder
+from python_code.utilities.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 HEAD_DLC_ITERATION = 17
@@ -170,7 +173,7 @@ def _resolve_overwrite_flags(
         or _dlc_metadata_is_outdated(recording_folder.eye_dlc_output, EYE_DLC_ITERATION)
         or _dlc_metadata_is_outdated(recording_folder.toy_dlc_output, TOY_DLC_ITERATION)
     ):
-        print("DLC outputs are from an outdated model iteration, forcing DLC reprocessing")
+        logger.warning("DLC outputs are from an outdated model iteration, forcing DLC reprocessing")
         overwrite_dlc = True
 
     if overwrite_synchronization:
@@ -207,7 +210,7 @@ def _run_postprocessing(
     run_gaze = include_eye and (flags["gaze"] or not recording_folder.is_gaze_postprocessed())
 
     if run_eye or run_skull or run_gaze:
-        print("Running gaze processing...")
+        logger.info("Running gaze processing...")
         process_recording(
             recording_folder=recording_folder,
             skip_eye=not run_eye,
@@ -217,8 +220,8 @@ def _run_postprocessing(
     recording_folder.check_eye_postprocessing()
     recording_folder.check_skull_postprocessing()
     recording_folder.check_gaze_postprocessing()
-    print("Gaze calculations complete")
-    print(f"Session processed: {recording_folder_path}")
+    logger.info("Gaze calculations complete")
+    logger.info("Session processed: %s", recording_folder_path)
 
 
 def full_pipeline(
@@ -243,24 +246,24 @@ def full_pipeline(
 
     # Synchronization
     if flags["synchronization"] or not recording_folder.is_synchronized():
-        print(f"Synchronizing videos at {recording_folder.base_recordings_folder}")
+        logger.info("Synchronizing videos at %s", recording_folder.base_recordings_folder)
         postprocess(session_folder_path=recording_folder.base_recordings_folder, include_eyes=include_eye)
     recording_folder.check_synchronization()
-    print("Synchronizing videos completed")
+    logger.info("Synchronizing videos completed")
 
     # Calibration
     if flags["calibration"] or not recording_folder.is_calibrated():
-        print("Calibrating session...")
+        logger.info("Calibrating session...")
         run_calibration_subprocess(calibration_videos_path=recording_folder.calibration_videos)
     recording_folder.check_calibration()
-    print("Calibration complete")
+    logger.info("Calibration complete")
 
     # DLC
     if flags["dlc"] or not recording_folder.is_dlc_processed():
-        print("Running pose estimation...")
+        logger.info("Running pose estimation...")
         run_skellyclicker_subprocess(recording_folder_path=recording_folder_path)
     recording_folder.check_dlc_output()
-    print("Pose estimation complete")
+    logger.info("Pose estimation complete")
 
     # Triangulation
     if flags["triangulation"] or not recording_folder.is_triangulated():
@@ -268,13 +271,13 @@ def full_pipeline(
             calibration_toml_path = recording_folder.calibration_toml_path
         if calibration_toml_path is None:
             raise ValueError("No calibration toml file found, could not run triangulation")
-        print("Running triangulation...")
+        logger.info("Running triangulation...")
         run_triangulation_subprocess(
             recording_folder_path=recording_folder_path,
             calibration_toml_path=calibration_toml_path,
         )
     recording_folder.check_triangulation()
-    print("Triangulation complete")
+    logger.info("Triangulation complete")
 
     _run_postprocessing(recording_folder, recording_folder_path, include_eye, flags)
 
@@ -291,7 +294,7 @@ if __name__=="__main__":
     recording_folder_path.mkdir(exist_ok=True, parents=False)
     (recording_folder_path / "mocap_data").mkdir(exist_ok=True, parents=False)
     (recording_folder_path / "eye_data").mkdir(exist_ok=True, parents=False)
-    print(f"Processing {recording_folder_path}")
+    logger.info("Processing %s", recording_folder_path)
 
     full_pipeline(
         recording_folder_path=recording_folder_path,
