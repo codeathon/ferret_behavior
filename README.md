@@ -35,6 +35,7 @@ End-to-end research pipeline for ferret multi-camera recording, pose reconstruct
 ```
 bs/
 ├── python_code/          # All source code (see Module reference)
+├── tests/                # pytest unit test suite (cameras, kinematics, gaze, batch)
 ├── Writerside/           # JetBrains Writerside knowledge-base docs
 ├── notes/                # Research notes and planning
 ├── docs/                 # Onboarding guide
@@ -118,6 +119,26 @@ After the gaze pipeline runs, open `analyzable_output/ferret_full_gaze_blender_v
 uv run python python_code/batch_processing/check_progress/check_progress.py
 ```
 
+### Running the test suite
+Install dev dependencies then run all tests:
+```bash
+uv sync --group dev
+uv run pytest
+```
+
+Run a specific module's tests:
+```bash
+uv run pytest tests/test_cameras.py -v
+uv run pytest tests/test_kinematics_core.py -v
+```
+
+Stop on first failure with short tracebacks:
+```bash
+uv run pytest -x --tb=short
+```
+
+See `tests/README.md` for the full test inventory and how to add new tests.
+
 ---
 
 ## 6. Data directory structure
@@ -162,7 +183,7 @@ Subprocess paths in `full_pipeline.py` default to `/home/scholl-lab/...` — upd
 - Most `__main__` blocks contain hardcoded lab machine paths — update before running. Exception: `cameras/run_recording.py` now has a dedicated `CONFIG` section at the top for this.
 - `cube_solver_demo.py` imports stale APIs that no longer exist.
 - Left/right eye assignment in `run_gaze_pipeline.py` is keyed to ferret ID `"757"` in the path string.
-- No pytest config or CI test gate exists.
+- No CI test gate exists — tests must be run manually via `uv run pytest`.
 
 ---
 
