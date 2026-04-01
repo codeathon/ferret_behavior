@@ -5,6 +5,10 @@ from typing import Dict, List, Tuple
 import cv2
 import numpy as np
 
+from python_code.utilities.logging_config import get_logger
+
+logger = get_logger(__name__)
+
 
 class PupilSynchronize:
     def __init__(self, folder_path: Path):
@@ -189,9 +193,8 @@ class PupilSynchronize:
                 self.raw_videos_path / "index_to_serial_number_mapping.json"
         )
         if not index_to_serial_number_path.exists():
-            print(
-                f"index_to_serial_number_path does not exist: {index_to_serial_number_path}")
-            print("default mapping will be used instead, double check it for correctness")
+            logger.warning("index_to_serial_number_mapping.json not found at %s — using default mapping", index_to_serial_number_path)
+            logger.warning("Verify default mapping correctness before proceeding")
             self.index_to_serial_number = {
                 "0": "24908831",
                 "1": "24908832",
@@ -205,9 +208,9 @@ class PupilSynchronize:
         self.synchronization_metadata["index_to_serial_number_mapping"] = self.index_to_serial_number
 
     def verify_index_to_serial_number(self):
-        print("Check index to serial number mapping (smaller serial numbers come first):")
+        logger.debug("Index-to-serial mapping (smaller serial numbers come first):")
         for cam_name in self.basler_camera_names:
-            print(f"\tcam {cam_name} serial number: {self.index_to_serial_number[cam_name]}")
+            logger.debug("  cam %s serial: %s", cam_name, self.index_to_serial_number[cam_name])
 
     def get_pupil_fps(self) -> Tuple[float, float]:
         eye0_time_elapsed_s = (
@@ -220,11 +223,9 @@ class PupilSynchronize:
                               ) / 1e9
         eye1_fps = self.pupil_eye1_timestamps_utc.shape[0] / eye1_time_elapsed_s
 
-        print(
-            f"pupil eye camera actual fps: eye0: {eye0_fps} fps, eye1: {eye1_fps} fps"
-        )
-        print(f"pupil eye camera average frame duration: eye0: {1 / eye0_fps * 1e9} ns, eye1: {1 / eye1_fps * 1e9} ns")
-        print(f"difference in fps: {eye0_fps - eye1_fps}")
+        logger.info("Pupil actual fps — eye0: %.2f, eye1: %.2f", eye0_fps, eye1_fps)
+        logger.debug("Average frame duration — eye0: %.1f ns, eye1: %.1f ns", 1 / eye0_fps * 1e9, 1 / eye1_fps * 1e9)
+        logger.debug("FPS difference: %.4f", eye0_fps - eye1_fps)
 
         self.synchronization_metadata["pupil_input_fps"] = {
             "eye0": eye0_fps,
@@ -240,12 +241,10 @@ class PupilSynchronize:
         eye_1_time_difference = np.diff(self.pupil_eye1_timestamps_utc)
         eye_1_fps = 1e9 / np.median(eye_1_time_difference)
 
-        print(
-            f"pupil eye camera median fps: eye0: {eye_0_fps} fps, eye1: {eye_1_fps} fps"
-        )
+        logger.info("Pupil median fps — eye0: %.2f, eye1: %.2f", eye_0_fps, eye_1_fps)
 
         if eye_0_fps != eye_1_fps:
-            print(f"WARNING: pupil median fps does not match for eye0 and eye1: {eye_0_fps} vs {eye_1_fps}")
+            logger.warning("Pupil median fps mismatch — eye0: %.2f vs eye1: %.2f", eye_0_fps, eye_1_fps)
 
         self.synchronization_metadata["pupil_median_fps"] = {
             "eye0": eye_0_fps,
@@ -264,7 +263,7 @@ class PupilSynchronize:
     
     def get_closest_pupil_frame_to_basler_frame(self, basler_frame_number: int) -> tuple[int, int]:
         basler_utc = np.median(self.synched_basler_timestamps_utc[:, basler_frame_number])
-        print(f"basler_utc is {basler_utc}")
+        logger.debug("Basler UTC reference: %s", basler_utc)
         eye0_match = np.searchsorted(self.pupil_eye0_timestamps_utc, basler_utc, side="right")
         if (basler_utc - self.pupil_eye0_timestamps_utc[eye0_match-1]) < abs(basler_utc - self.pupil_eye0_timestamps_utc[eye0_match]):
             eye0_frame_number = eye0_match-1
@@ -277,8 +276,8 @@ class PupilSynchronize:
         else: 
             eye1_frame_number = eye1_match
 
-        print(f"eye 0 match is frame {eye0_frame_number} at utc {self.pupil_eye0_timestamps_utc[eye0_frame_number]}")
-        print(f"eye 1 match is frame {eye1_frame_number} at utc {self.pupil_eye1_timestamps_utc[eye1_frame_number]}")
+        logger.debug("Eye 0 match: frame %d at utc %s", eye0_frame_number, self.pupil_eye0_timestamps_utc[eye0_frame_number])
+        logger.debug("Eye 1 match: frame %d at utc %s", eye1_frame_number, self.pupil_eye1_timestamps_utc[eye1_frame_number])
 
         return eye0_frame_number, eye1_frame_number
 
@@ -298,7 +297,7 @@ class PupilSynchronize:
             self.pupil_eye1_timestamps_utc >= self.latest_synched_start_utc
         )[0][0]
 
-        print(f"starting offsets in frames: {starting_offsets_in_frames}")
+        logger.debug("Starting offsets in frames: %s", starting_offsets_in_frames)
         return starting_offsets_in_frames
 
     def find_ending_offsets_in_frames(self) -> Dict[str, int]:
@@ -316,7 +315,7 @@ class PupilSynchronize:
             self.pupil_eye1_timestamps_utc >= self.earliest_synched_end_utc
         )[0][0]
 
-        print(f"ending offsets in frames: {ending_offsets_in_frames}")
+        logger.debug("Ending offsets in frames: %s", ending_offsets_in_frames)
         return ending_offsets_in_frames
 
     def save_synchronized_timestamps(self):
@@ -324,7 +323,7 @@ class PupilSynchronize:
             raise ValueError(
                 "synchronized_timestamps is None, this method should only be called from synchronize(), it should not be called directly")
         for cam_name, timestamps in self.synchronized_timestamps.items():
-            print(f"cam {cam_name} timestamps shape: {timestamps.shape}")
+            logger.debug("cam %s timestamps shape: %s", cam_name, timestamps.shape)
             np.save(f"{self.output_path}/cam_{cam_name}_synchronized_timestamps.npy", timestamps)
 
     def save_metadata(self):
@@ -351,7 +350,7 @@ class PupilSynchronize:
             output_video_pathstring, fourcc, framerate, framesize
         )
 
-        print(f"saving synchronized video to {output_video_pathstring}")
+        logger.info("Saving synchronized video to %s", output_video_pathstring)
 
         current_frame = 0
         written_frames = 0
@@ -383,7 +382,7 @@ class PupilSynchronize:
         raw_timestamps = self.pupil_eye0_timestamps_utc.copy() if camera_name == "eye0" else self.pupil_eye1_timestamps_utc.copy()
         camera_median_fps = self.get_pupil_median_fps()[0] if camera_name == "eye0" else self.get_pupil_median_fps()[1]
         camera_median_fps = round(camera_median_fps, 2)
-        print(f"camera median fps: {camera_median_fps}")
+        logger.debug("Camera median fps: %.2f", camera_median_fps)
         median_duration = 1e9 / camera_median_fps
 
         framerate = cap.get(cv2.CAP_PROP_FPS)
@@ -397,7 +396,7 @@ class PupilSynchronize:
             output_video_pathstring, fourcc, camera_median_fps, framesize
         )
 
-        print(f"saving synchronized video to {output_video_pathstring}")
+        logger.info("Saving synchronized pupil video to %s", output_video_pathstring)
 
         current_frame = 0
         written_frames = 0
@@ -411,18 +410,17 @@ class PupilSynchronize:
             reference_timestamp = self.latest_synched_start_utc + (written_frames * median_duration)
             if current_frame >= len(raw_timestamps):
                 if reference_timestamp > self.earliest_synched_end_utc:
-                    print("reached target ending timestamp, exiting")
+                    logger.debug("Reached target ending timestamp, exiting")
                     break
                 else:
-                    print("ran out of frames")
-                    print(
-                        f"target final timestamp: {self.earliest_synched_end_utc}, actual final timestamp: {raw_timestamps[-1]}, final reference timestamp: {reference_timestamp}")
+                    logger.warning("Ran out of frames — target: %s, actual final: %s, ref: %s",
+                                   self.earliest_synched_end_utc, raw_timestamps[-1], reference_timestamp)
                     # TODO: We may want to fill in dummy frames here
                     break
             current_timestamp = raw_timestamps[current_frame]
             if reference_timestamp > self.earliest_synched_end_utc:
                 # past the last synchronized time
-                print("reached target ending timestamp, exiting")
+                logger.debug("Reached target ending timestamp, exiting")
                 break
             elif current_timestamp < self.latest_synched_start_utc - (0.5 * median_duration):
                 # before the first synchronized time
@@ -442,7 +440,7 @@ class PupilSynchronize:
                 # current frame is too early, read it and move to the next frame
                 ret, frame = cap.read()
                 if not ret:
-                    print(f"Unable to read frame {current_frame}")
+                    logger.error("Unable to read frame %d", current_frame)
                     raise ValueError("Unable to read frame")
                     break
                 previous_frame = frame
@@ -452,7 +450,7 @@ class PupilSynchronize:
                 # current frame is in the correct time window
                 ret, frame = cap.read()
                 if not ret:
-                    print(f"Unable to read frame {current_frame}")
+                    logger.error("Unable to read frame %d", current_frame)
                     raise ValueError("Unable to read frame")
                     break
                 previous_frame = frame
@@ -463,10 +461,8 @@ class PupilSynchronize:
                 written_frames += 1
                 current_frame += 1
 
-        print(f"Video {output_video_pathstring} saved with {written_frames} frames and {dropped_frames} dropped frames\n"
-              f"\t(difference is {written_frames - dropped_frames})\n"
-              f"\tearly frames: {early_frames}\n"
-              f"\tskipped frames: {skipped_frames}")
+        logger.info("Saved %s — %d frames, %d dropped, %d early, %d skipped",
+                    output_video_pathstring, written_frames, dropped_frames, early_frames, skipped_frames)
 
         self.synchronized_timestamps[camera_name] = np.array(synchronized_timestamps)
 
@@ -502,18 +498,17 @@ class PupilSynchronize:
                 cap = cv2.VideoCapture(str(self.output_path / f"{self.index_to_serial_number[cam_name]}.mp4"))
             frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
             if frame_count != self.synchronized_timestamps[cam_name].shape[0]:
-                print(
-                    f"frame count mismatch for cam {cam_name}: video: {frame_count} vs timestamps: {self.synchronized_timestamps[cam_name].shape[0]}")
+                logger.warning("Frame count mismatch for cam %s: video %d vs timestamps %d",
+                               cam_name, frame_count, self.synchronized_timestamps[cam_name].shape[0])
             else:
-                print(
-                    f"frame count match for cam {cam_name}: video: {frame_count} vs timestamps: {self.synchronized_timestamps[cam_name].shape[0]}")
+                logger.debug("Frame count match for cam %s: %d", cam_name, frame_count)
 
             cap.release()
 
     def synchronize(self):
         self.output_path.mkdir(parents=True, exist_ok=True)
-        print(f"latest synched start utc: {self.latest_synched_start_utc}")
-        print(f"earliest synched end utc: {self.earliest_synched_end_utc}")
+        logger.info("Latest synched start utc: %d", self.latest_synched_start_utc)
+        logger.info("Earliest synched end utc: %d", self.earliest_synched_end_utc)
         starting_offsets_frames = self.find_starting_offsets_in_frames()
         ending_offsets_frames = self.find_ending_offsets_in_frames()
 
@@ -626,31 +621,17 @@ if __name__ == "__main__":
     utc_start_time_pupil = pupil_synchronize.pupil_start_time_utc
     utc_start_time_basler = pupil_synchronize.basler_start_time_utc
 
-    print(f"Pupil start time in pupil time (ns): {pupil_synchronize.pupil_start_time}")
-    print(f"Pupil start time in utc (ns):  {utc_start_time_pupil}")
-    print(f"Basler start time in utc (ns): {utc_start_time_basler}")
-    print(
-        f"Basler start time in Basler time (ns): {pupil_synchronize.basler_start_time}"
-    )
-
-    print(
-        f"Difference between start times (basler - pupil) in s: {pupil_synchronize.difference_in_start_times / 1e9}"
-    )
-
-    print(f"Pupil start time as date time: {np.datetime64(utc_start_time_pupil, 'ns')}")
-    print(
-        f"Basler start time as date time: {np.datetime64(utc_start_time_basler, 'ns')}"
-    )
-
-    print(
-        f"basler start times per camera: {pupil_synchronize.basler_timestamp_mapping['starting_mapping']['camera_timestamps']}"
-    )
-
-    print(
-        f"pupil timestamps shapes - eye0: {pupil_synchronize.pupil_eye0_timestamps_utc.shape} eye1: {pupil_synchronize.pupil_eye1_timestamps_utc.shape}"
-    )
-    print(f"pupil timestamps (eye0): {pupil_synchronize.pupil_eye0_timestamps_utc}")
-    print(f"pupil timestamps (eye1): {pupil_synchronize.pupil_eye1_timestamps_utc}")
+    logger.info("Pupil start (pupil ns): %d", pupil_synchronize.pupil_start_time)
+    logger.info("Pupil start (utc ns): %d", utc_start_time_pupil)
+    logger.info("Basler start (utc ns): %d", utc_start_time_basler)
+    logger.info("Basler start (Basler ns): %d", pupil_synchronize.basler_start_time)
+    logger.info("Start time difference (basler - pupil) s: %.6f", pupil_synchronize.difference_in_start_times / 1e9)
+    logger.info("Pupil start datetime: %s", np.datetime64(utc_start_time_pupil, 'ns'))
+    logger.info("Basler start datetime: %s", np.datetime64(utc_start_time_basler, 'ns'))
+    logger.info("Basler start times per camera: %s", pupil_synchronize.basler_timestamp_mapping['starting_mapping']['camera_timestamps'])
+    logger.info("Pupil timestamp shapes — eye0: %s eye1: %s", pupil_synchronize.pupil_eye0_timestamps_utc.shape, pupil_synchronize.pupil_eye1_timestamps_utc.shape)
+    logger.debug("Pupil timestamps (eye0): %s", pupil_synchronize.pupil_eye0_timestamps_utc)
+    logger.debug("Pupil timestamps (eye1): %s", pupil_synchronize.pupil_eye1_timestamps_utc)
 
     pupil_synchronize.get_closest_pupil_frame_to_basler_frame(3377)
     pupil_synchronize.get_closest_pupil_frame_to_basler_frame(8754)

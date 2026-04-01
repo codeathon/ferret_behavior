@@ -8,6 +8,9 @@ from python_code.ferret_gaze.run_gaze_pipeline import run_gaze_pipeline
 from python_code.rigid_body_solver.ferret_skull_solver import run_ferret_skull_solver_from_recording_folder
 from python_code.utilities.find_bad_eye_data import bad_eye_data
 from python_code.utilities.folder_utilities.recording_folder import RecordingFolder
+from python_code.utilities.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 def process_recording(
@@ -49,11 +52,11 @@ if __name__ == "__main__":
         recording_folder = Path(sys.argv[1])
     else:
         recording_folder = recording_folder_path
-        print(f"Using default directory: {recording_folder}")
+        logger.info("Using default directory: %s", recording_folder)
 
     if not recording_folder.exists():
-        print(f"Error: Directory does not exist: {recording_folder}")
-        print("\nUsage: python plot_vor_correlation_grid.py [recording_folder] [output_dir]")
+        logger.error("Directory does not exist: %s", recording_folder)
+        logger.info("Usage: python postprocess_recording.py [recording_folder] [--skip-eye] [--skip-skull] [--skip-gaze]")
         sys.exit(1)
 
     flags = [a for a in sys.argv[1:] if a.startswith("-")]
@@ -67,7 +70,7 @@ if __name__ == "__main__":
         elif flag in ("--skip-gaze", "-g"):
             skip_gaze = True
         else:
-            print(f"Warning: unknown flag {flag}")
+            logger.warning("Unknown flag: %s", flag)
 
     recording_folder = RecordingFolder.from_folder_path(recording_folder_path)
     pre_recording_validation(recording_folder=recording_folder)

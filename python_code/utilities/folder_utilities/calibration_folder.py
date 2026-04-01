@@ -4,6 +4,10 @@ from enum import Enum
 
 from pydantic import BaseModel
 
+from python_code.utilities.logging_config import get_logger
+
+logger = get_logger(__name__)
+
 
 class CalibrationPipelineStep(Enum):
     RAW = "raw"
@@ -41,9 +45,9 @@ class CalibrationFolder(BaseModel):
                 try:
                     recording_folder.check_calibration()
                     recording_folder.processing_step = CalibrationPipelineStep.CALIBRATED
-                    print(f"Folder is calibrated: {folder}")
+                    logger.debug("Folder is calibrated: %s", folder)
                 except ValueError as e:
-                    print(f"Folder is not calibrated: {e}")
+                    logger.debug("Folder is not calibrated: %s", e)
                     raise ValueError(
                         f"Folder is not calibrated: {folder}"
                     )
@@ -51,9 +55,9 @@ class CalibrationFolder(BaseModel):
                 try:
                     recording_folder.check_synchronization()
                     recording_folder.processing_step = CalibrationPipelineStep.SYNCHRONIZED
-                    print(f"Folder is synchronized: {folder}")
+                    logger.debug("Folder is synchronized: %s", folder)
                 except ValueError as e:
-                    print(f"Folder is not synchronized: {e}")
+                    logger.debug("Folder is not synchronized: %s", e)
                     raise ValueError(
                         f"Folder is not synchronized: {folder}"
                     )

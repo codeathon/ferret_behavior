@@ -3,11 +3,14 @@ import shutil
 
 from python_code.cameras.synchronization.timestamp_converter import TimestampConverter
 from python_code.cameras.synchronization.timestamp_synchronize import TimestampSynchronize
+from python_code.utilities.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 def copy_files(files: list[Path], destination: Path):
     if len(files) == 0:
         raise ValueError(f"attemped to copy files to {str(destination)} but no files provided")
-    print(f"Copying files {[file.name for file in files]} to {str(destination)}")
+    logger.info("Copying %s to %s", [f.name for f in files], destination)
     for file_path in files:
         shutil.copy2(src = file_path, dst=destination)
 

@@ -7,6 +7,9 @@ import json
 from pathlib import Path
 from python_code.cameras.diagnostics.skellycam_plots import timestamps_array_to_dictionary, calculate_camera_diagnostic_results
 from python_code.cameras.intrinsics.intrinsics_corrector import IntrinsicsCorrector, get_calibrations_from_json
+from python_code.utilities.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 class TimestampSynchronize:
     def __init__(self, folder_path: Path, flip_videos: bool = False, correct_intrinsics: bool = True):
@@ -53,9 +56,9 @@ class TimestampSynchronize:
         target_framecount = (
             self.get_lowest_postoffset_frame_count() - 1
         )  # -1 accounts for rounding errors in offset i.e. drop a frame off the end to be sure we don't overflow array
-        print(f"synchronizing videos to target framecount: {target_framecount}")
+        logger.info("Synchronizing videos to target framecount: %d", target_framecount)
         for video_name, cap in self.capture_dict.items():
-            print(f"synchronizing: {video_name}")
+            logger.info("Synchronizing: %s", video_name)
             current_framecount = 0
             offset = self.frame_offset_dict[video_name.split(".")[0]]
             while current_framecount < target_framecount:  # < to account for 0 indexing
@@ -71,18 +74,18 @@ class TimestampSynchronize:
                     current_framecount += 1
                 else:
                     offset -= 1
-        print("Saving new timestamps files")
+        logger.info("Saving new timestamp files")
         self.save_new_timestamps(target_framecount=target_framecount)
         if self.timestamp_mapping_path.exists():
-            print("Copying timestamp mapping file")
+            logger.info("Copying timestamp mapping file")
             shutil.copyfile(self.timestamp_mapping_path, self.synched_videos_path / self.timestamp_mapping_file_name)
         # shutil.copyfile(self.index_to_serial_number_map_path, self.synched_videos_path / self.index_to_serial_number_map_file_name)
 
         self.close()
-        print("Done synchronizing")
+        logger.info("Done synchronizing")
 
     def setup(self):
-        print("Setting up for synchronization...")
+        logger.info("Setting up for synchronization...")
         self.create_capture_dict()
         self.validate_fps()
         if self.correct_intrinsics:
@@ -96,9 +99,9 @@ class TimestampSynchronize:
         try:
             timestamp_dictionary = timestamps_array_to_dictionary(self.timestamps)
             diagnostics = calculate_camera_diagnostic_results(timestamps_dictionary=timestamp_dictionary)
-            print(f"Timestamp diagnostics: {diagnostics}")
+            logger.info("Timestamp diagnostics: %s", diagnostics)
         except Exception as e:
-            print(f"Unable to print timestamp diagnostics due to error {e}")
+            logger.warning("Unable to log timestamp diagnostics: %s", e)
 
     def create_capture_dict(self):
         self.capture_dict = {
@@ -144,13 +147,13 @@ class TimestampSynchronize:
         }
         if not set(self.capture_dict.keys()).issubset(set(self.starting_timestamp_dict.keys())):
             raise ValueError(f"All video names ({self.capture_dict.keys()}) not found in timestamp dict ({self.starting_timestamp_dict.keys()})") 
-        print(f"starting timestamp dict: {self.starting_timestamp_dict}")
+        logger.debug("Starting timestamp dict: %s", self.starting_timestamp_dict)
 
 
     def create_frame_offset_dict(self):
-        print(f"finding latest timestamp in {sorted(self.starting_timestamp_dict.values())}")
+        logger.debug("Finding latest timestamp in %s", sorted(self.starting_timestamp_dict.values()))
         latest_start = sorted(self.starting_timestamp_dict.values())[-1]
-        print(f"lastest start is {latest_start}")
+        logger.debug("Latest start is %s", latest_start)
         self.frame_offset_dict: Dict[str, int] = {}
 
         for i, video_name in self.index_to_serial_number_map.items():
@@ -159,22 +162,22 @@ class TimestampSynchronize:
 
         self.frame_offset_dict = self.refine_frame_offsets(self.frame_offset_dict)
         for i, video_name in self.index_to_serial_number_map.items():
-            print(f"starting time for cam {video_name} is {self.timestamps[int(i), self.frame_offset_dict[video_name]]}")
-            print(f"start time off frame offset: {self.timestamps[int(i), self.frame_offset_dict[video_name]] - latest_start}")
+            logger.debug("Starting time for cam %s: %s", video_name, self.timestamps[int(i), self.frame_offset_dict[video_name]])
+            logger.debug("Start time offset from latest: %s", self.timestamps[int(i), self.frame_offset_dict[video_name]] - latest_start)
 
-        print(f"Frame offset dict: {self.frame_offset_dict}")
+        logger.debug("Frame offset dict: %s", self.frame_offset_dict)
 
     def refine_frame_offsets(self, frame_offsets: dict):
-        print("refining frame offsets to minimize frame spread")
+        logger.debug("Refining frame offsets to minimize frame spread")
         reference_camera = next((key for key, value in frame_offsets.items() if value == 0), None)
         if reference_camera is None:
-            print("No camera with 0 offset found")
+            logger.warning("No camera with 0 offset found")
             return frame_offsets
         start_times = self._get_start_times_from_frame_offsets(frame_offsets=frame_offsets)
         best_spread = max(start_times.values()) - min(start_times.values())
         best_frame_offsets = frame_offsets
 
-        print(f"starting offsets are {best_frame_offsets} with spread of {best_spread} ns")
+        logger.debug("Starting offsets: %s with spread %d ns", best_frame_offsets, best_spread)
 
         should_continue = True
         while should_continue:
@@ -222,7 +225,7 @@ class TimestampSynchronize:
                     should_continue = True
                     continue
 
-        print(f"best frame offsets found are {best_frame_offsets} with a spread of {best_spread} ns")
+        logger.info("Best frame offsets: %s with spread %d ns", best_frame_offsets, best_spread)
 
         return best_frame_offsets
 
@@ -245,7 +248,7 @@ class TimestampSynchronize:
         fps = set(fps_dict.values())
 
         if len(fps) > 1:
-            print(f"video fps: {fps_dict}")
+            logger.warning("Mismatched video fps: %s", fps_dict)
             raise ValueError("Not all videos have the same fps")
 
         self.fps = fps.pop()
@@ -256,12 +259,12 @@ class TimestampSynchronize:
             new_timestamps = self.timestamps[int(i), offset:target_framecount+offset]
             cam_name = video_name.split(".")[0]
             timestamps_name = f"{cam_name}_synchronized_timestamps_basler_time.npy"
-            print(f"Cam {cam_name} starts at {new_timestamps[0]}, ends at {new_timestamps[-1]}")
+            logger.debug("Cam %s starts at %s, ends at %s", cam_name, new_timestamps[0], new_timestamps[-1])
             np.save(self.synched_videos_path / timestamps_name, new_timestamps)
         
 
     def close(self):
-        print("Closing all capture objects and writers")
+        logger.debug("Closing all capture objects and writers")
         self.release_captures()
         self.release_writers()
 

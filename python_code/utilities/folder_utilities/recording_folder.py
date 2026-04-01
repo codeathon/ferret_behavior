@@ -4,6 +4,10 @@ from enum import Enum
 
 from pydantic import BaseModel
 
+from python_code.utilities.logging_config import get_logger
+
+logger = get_logger(__name__)
+
 
 class PipelineStep(Enum):
     RAW = "raw"
@@ -53,7 +57,7 @@ class RecordingFolder(BaseModel):
             is_clip = False
 
             if version_name != "full_recording":
-                print(version_name)
+                logger.debug("Unexpected version_name: %s", version_name)
                 raise ValueError(
                     f"Folder must be in 'clips' or be 'full_recording': {folder}"
                 )
@@ -85,9 +89,9 @@ class RecordingFolder(BaseModel):
                 try:
                     recording_folder.check_gaze_postprocessing()
                     recording_folder.processing_step = PipelineStep.GAZE_POST_PROCESSED
-                    print(f"Folder is post-processed: {folder}")
+                    logger.debug("Folder is gaze-post-processed: %s", folder)
                 except ValueError as e:
-                    print(f"Folder is not post-processed: {e}")
+                    logger.debug("Folder is not gaze-post-processed: %s", e)
                     raise ValueError(
                         f"Folder is not post-processed: {folder}"
                     )
@@ -95,9 +99,9 @@ class RecordingFolder(BaseModel):
                 try:
                     recording_folder.check_skull_postprocessing()
                     recording_folder.processing_step = PipelineStep.SKULL_POST_PROCESSED
-                    print(f"Folder is skull-post-processed: {folder}")
+                    logger.debug("Folder is skull-post-processed: %s", folder)
                 except ValueError as e:
-                    print(f"Folder is not skull-post-processed: {e}")
+                    logger.debug("Folder is not skull-post-processed: %s", e)
                     raise ValueError(
                         f"Folder is not skull-post-processed: {folder}"
                     )
@@ -105,9 +109,9 @@ class RecordingFolder(BaseModel):
                 try:
                     recording_folder.check_eye_postprocessing()
                     recording_folder.processing_step = PipelineStep.EYE_POST_PROCESSED
-                    print(f"Folder is eye-post-processed: {folder}")
+                    logger.debug("Folder is eye-post-processed: %s", folder)
                 except ValueError as e:
-                    print(f"Folder is not eye-post-processed: {e}")
+                    logger.debug("Folder is not eye-post-processed: %s", e)
                     raise ValueError(
                         f"Folder is not eye-post-processed: {folder}"
                     )
@@ -115,9 +119,9 @@ class RecordingFolder(BaseModel):
                 try:
                     recording_folder.check_triangulation()
                     recording_folder.processing_step = PipelineStep.TRIANGULATED
-                    print(f"Folder is triangulated: {folder}")
+                    logger.debug("Folder is triangulated: %s", folder)
                 except ValueError as e:
-                    print(f"Folder is not triangulated: {e}")
+                    logger.debug("Folder is not triangulated: %s", e)
                     raise ValueError(
                         f"Folder is not triangulated: {folder}"
                     )
@@ -125,9 +129,9 @@ class RecordingFolder(BaseModel):
                 try:
                     recording_folder.check_dlc_output()
                     recording_folder.processing_step = PipelineStep.DLCED
-                    print(f"Folder is DLCed: {folder}")
+                    logger.debug("Folder is DLCed: %s", folder)
                 except ValueError as e:
-                    print(f"Folder is not DLCed: {e}")
+                    logger.debug("Folder is not DLCed: %s", e)
                     raise ValueError(
                         f"Folder is not DLCed: {folder}"
                     )
@@ -136,7 +140,7 @@ class RecordingFolder(BaseModel):
                     recording_folder.check_synchronization()
                     recording_folder.processing_step = PipelineStep.SYNCHRONIZED
                 except ValueError as e:
-                    print(f"Folder is not synchronized: {e}")
+                    logger.debug("Folder is not synchronized: %s", e)
                     raise ValueError(
                         f"Folder is not synchronized: {folder}"
                     )
@@ -895,7 +899,7 @@ class RecordingFolder(BaseModel):
         try:
             self.check_dlc_output(enforce_toy=enforce_toy)
         except ValueError as e:
-            print(f"DLC output failed with error: {e}")
+            logger.debug("DLC output failed: %s", e)
             raise ValueError("DLC output failed, triangulation cannot be checked")
 
         for name, path in {
@@ -962,7 +966,7 @@ class RecordingFolder(BaseModel):
         try:
             self.check_triangulation(enforce_toy=enforce_toy, enforce_annotated=enforce_annotated)
         except ValueError as e:
-            print(f"Triangulation failed with error: {e}")
+            logger.debug("Triangulation failed: %s", e)
             raise ValueError("Triangulation failed, postprocessing cannot be checked")
 
         for name, path in {
@@ -990,13 +994,13 @@ class RecordingFolder(BaseModel):
         try:
             self.check_eye_postprocessing()
         except ValueError as e:
-            print(f"eyes not postprocessed: {e}")
+            logger.debug("Eyes not postprocessed: %s", e)
             raise ValueError("Eyes are not postprocessed, unable to check gaze postprocessing")
         
         try:
             self.check_skull_postprocessing(enforce_toy=enforce_toy, enforce_annotated=enforce_annotated)
         except ValueError as e:
-            print(f"skull not postprocessed: {e}")
+            logger.debug("Skull not postprocessed: %s", e)
             raise ValueError("skull not postprocessed, unable to check gaze postprocessing")
         
         for name, path in {

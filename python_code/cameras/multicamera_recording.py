@@ -8,7 +8,6 @@ camera array and wires together the focused subsystems:
     video_writers   — VideoWriterManager (OpenCV or ffmpeg backends)
     timestamp_utils — hardware timestamp latching and saving
     grab_loops      — GrabLoopRunner (frame retrieval loop)
-    logging_config  — configurable file + console logger
 
 Run a recording session via run_recording.py (preferred) or call this class
 directly from your own script.
@@ -29,10 +28,10 @@ from python_code.cameras.camera_config import (
     get_image_shape,
 )
 from python_code.cameras.grab_loops import GrabLoopRunner
-from python_code.cameras.logging_config import get_camera_logger
 from python_code.cameras.video_writers import VideoWriterManager
+from python_code.utilities.logging_config import get_logger
 
-logger = get_camera_logger(__name__)
+logger = get_logger(__name__)
 
 
 # ---------------------------------------------------------------------------

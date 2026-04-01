@@ -3,7 +3,7 @@ Unit tests for the refactored python_code/cameras package.
 
 Covers the five focused sub-modules introduced during the camera_restructure:
     camera_config   — CameraProfile, CAMERAS, derived constants, helper functions
-    logging_config  — get_camera_logger: file handler, console handler, fallback
+    logging_config  — get_logger (shared utility): file handler, console handler, fallback
     timestamp_utils — trim_timestamp_zeros (pure), save_timestamps (I/O)
     video_writers   — VideoWriterManager guard conditions and state management
     grab_loops      — GrabLoopRunner pure logic (seconds→frames, statistics return)
@@ -57,7 +57,7 @@ from python_code.cameras.camera_config import (  # noqa: E402
     get_camera_profile,
     get_image_shape,
 )
-from python_code.cameras.logging_config import get_camera_logger  # noqa: E402
+from python_code.utilities.logging_config import get_logger as get_camera_logger  # noqa: E402
 from python_code.cameras.timestamp_utils import (  # noqa: E402
     save_timestamps,
     trim_timestamp_zeros,

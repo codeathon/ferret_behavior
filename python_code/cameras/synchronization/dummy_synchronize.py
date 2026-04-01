@@ -3,6 +3,10 @@ import numpy as np
 
 from pathlib import Path
 
+from python_code.utilities.logging_config import get_logger
+
+logger = get_logger(__name__)
+
 class DummySynchronize:
     def __init__(self, folder_path: Path):
         self.raw_videos_path = folder_path / "raw_videos"
@@ -51,7 +55,7 @@ class DummySynchronize:
         fps = set(cap.get(cv2.CAP_PROP_FPS) for cap in self.capture_dict.values())
 
         if len(fps) > 1:
-            print(f"set of video fps: {fps}")
+            logger.warning("Mismatched video fps: %s", fps)
             raise ValueError("Not all videos have the same fps")
         
     def close(self):

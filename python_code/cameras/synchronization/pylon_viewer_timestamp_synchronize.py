@@ -4,6 +4,10 @@ import cv2
 
 from pathlib import Path
 
+from python_code.utilities.logging_config import get_logger
+
+logger = get_logger(__name__)
+
 
 class TimestampSynchronize:
     def __init__(self, folder_path: Path):
@@ -17,9 +21,9 @@ class TimestampSynchronize:
         target_framecount = (
             self.get_lowest_postoffset_frame_count() - 1
         )  # -1 accounts for rounding errors in calculating offset
-        print(f"synchronizing videos to target framecount: {target_framecount}")
+        logger.info("Synchronizing videos to target framecount: %d", target_framecount)
         for video_name, cap in self.capture_dict.items():
-            print(f"synchronizing: {video_name}")
+            logger.info("Synchronizing: %s", video_name)
             current_framecount = 0
             offset = self.frame_offset_dict[video_name]
             while current_framecount < target_framecount:  # < to account for 0 indexing
@@ -32,10 +36,10 @@ class TimestampSynchronize:
                 else:
                     offset -= 1
         self.close()
-        print("Done synchronizing")
+        logger.info("Done synchronizing")
 
     def setup(self):
-        print("Setting up for synchronization...")
+        logger.info("Setting up for synchronization...")
         self.create_capture_dict()
         self.validate_fps()
         self.create_writer_dict()
@@ -80,11 +84,9 @@ class TimestampSynchronize:
                 timedelta(microseconds=offset_microseconds)
                 / timedelta(seconds=frame_duration_seconds)
             )
-            print(f"{video_name} offset in microseconds: {offset_microseconds}")
-            print(f"{video_name} offset in frames: {offset_frames}")
-            print(
-                f"{video_name} total frames: {int(self.capture_dict[video_name].get(cv2.CAP_PROP_FRAME_COUNT))}"
-            )
+            logger.debug("%s offset: %.1f µs / %d frames / %d total frames",
+                         video_name, offset_microseconds, offset_frames,
+                         int(self.capture_dict[video_name].get(cv2.CAP_PROP_FRAME_COUNT)))
             self.frame_offset_dict[video_name] = offset_frames
 
     def get_lowest_postoffset_frame_count(self) -> int:
@@ -99,13 +101,13 @@ class TimestampSynchronize:
         fps = set(cap.get(cv2.CAP_PROP_FPS) for cap in self.capture_dict.values())
 
         if len(fps) > 1:
-            print(f"set of video fps: {fps}")
+            logger.warning("Mismatched video fps: %s", fps)
             raise ValueError("Not all videos have the same fps")
 
         self.fps = fps.pop()
 
     def close(self):
-        print("Closing all capture objects and writers")
+        logger.debug("Closing all capture objects and writers")
         self.release_captures()
         self.release_writers()
 

@@ -2,16 +2,20 @@ import numpy as np
 import pandas as pd
 from pathlib import Path
 
+from python_code.utilities.logging_config import get_logger
+
+logger = get_logger(__name__)
+
 def tidy_head_data(labels_path: Path, timestamps_path: Path):
     df_with_mean = pd.read_csv(labels_path)
-    print(df_with_mean.head(5))
-    print(df_with_mean.columns)
+    logger.debug("head data head:\n%s", df_with_mean.head(5))
+    logger.debug("head data columns: %s", list(df_with_mean.columns))
 
     # calculate mean
     selected_columns_x = ['nose_x','left_cam_tip_x', 'right_cam_tip_x', 'base_x', 'left_eye_x', 'right_eye_x', 'left_ear_x', 'right_ear_x']
     selected_columns_y = ['nose_y','left_cam_tip_y', 'right_cam_tip_y', 'base_y', 'left_eye_y', 'right_eye_y', 'left_ear_y', 'right_ear_y']
 
-    print(selected_columns_y)
+    logger.debug("Selected y columns: %s", selected_columns_y)
 
     df_with_mean['head_mean_x'] = df_with_mean[selected_columns_x].mean(axis=1)
     df_with_mean['head_mean_y'] = df_with_mean[selected_columns_y].mean(axis=1)
@@ -20,7 +24,7 @@ def tidy_head_data(labels_path: Path, timestamps_path: Path):
 
     data_length = len(df_with_mean)
 
-    print(f"Loading timestamps from {timestamps_path}")
+    logger.info("Loading timestamps from %s", timestamps_path)
     timestamp_files = list(timestamps_path.glob("*.npy"))
     timestamp_files.sort(key = lambda path : path.stem)
     timestamp_arrays = [np.load(path) for path in timestamp_files]
@@ -39,19 +43,19 @@ def tidy_head_data(labels_path: Path, timestamps_path: Path):
         df["y"] = df_with_mean[f"{marker}_y"]
         df["processing_level"] = "raw"
         tidy_df_list.append(df)
-        print(df.head)
+        logger.debug("Marker %s head: %s", marker, df.head)
     return pd.concat(tidy_df_list).sort_values(['frame','keypoint'])
 
 def tidy_toy_data(labels_path: Path, timestamps_path: Path) -> pd.DataFrame:
     machine_labels_df = pd.read_csv(labels_path)
-    print(machine_labels_df.head(5))
-    print(machine_labels_df.columns)
+    logger.debug("toy data head:\n%s", machine_labels_df.head(5))
+    logger.debug("toy data columns: %s", list(machine_labels_df.columns))
 
     machine_labels_df = machine_labels_df.sort_values("video")
 
     data_length = len(machine_labels_df)
 
-    print(f"Loading timestamps from {timestamps_path}")
+    logger.info("Loading timestamps from %s", timestamps_path)
     timestamp_files = list(timestamps_path.glob("*.npy"))
     timestamp_files.sort(key = lambda path : path.stem)
     timestamp_arrays = [np.load(path) for path in timestamp_files]
@@ -70,7 +74,7 @@ def tidy_toy_data(labels_path: Path, timestamps_path: Path) -> pd.DataFrame:
         df["y"] = machine_labels_df[f"{marker}_y"]
         df["processing_level"] = "raw"
         tidy_df_list.append(df)
-        print(df.head)
+        logger.debug("Marker %s head: %s", marker, df.head)
     return pd.concat(tidy_df_list).sort_values(['frame','keypoint'])
 
 

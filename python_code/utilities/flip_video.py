@@ -2,6 +2,10 @@ import cv2
 from pathlib import Path
 from enum import Enum
 
+from python_code.utilities.logging_config import get_logger
+
+logger = get_logger(__name__)
+
 class FlipMethod(Enum):
     HORIZONTAL = 1
     VERTICAL = 0
@@ -21,7 +25,7 @@ def flip_video(video: Path, flip_method: FlipMethod):
     while True:
         ret, frame = cap.read()
         if not ret:
-            print("Finished reading video")
+            logger.debug("Finished reading video: %s", video)
             break
 
         flipped_frame = cv2.flip(frame, flip_method.value)

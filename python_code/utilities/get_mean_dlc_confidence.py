@@ -2,6 +2,10 @@ import pandas as pd
 import numpy as np
 from pathlib import Path
 
+from python_code.utilities.logging_config import get_logger
+
+logger = get_logger(__name__)
+
 def get_mean_dlc_confidence(path_to_folder_with_dlc_csvs: Path, path_to_synchronized_video_folder: Path, camera_names: list[str], save: bool=True):
     tidy_confidence_dfs = []
     for camera_name in camera_names:
@@ -17,7 +21,7 @@ def get_mean_dlc_confidence(path_to_folder_with_dlc_csvs: Path, path_to_synchron
     if save:
         save_path = path_to_synchronized_video_folder.parent / f"{path_to_folder_with_dlc_csvs.stem}_mean_confidence.csv"
         session_confidence_df.to_csv(save_path, index=False)
-        print(f"mean confidence values saved to {save_path}")
+        logger.info("Mean confidence values saved to %s", save_path)
 
     return session_confidence_df
 
@@ -35,7 +39,7 @@ def get_one_camera_confidence(path_to_folder_with_dlc_csvs: Path, path_to_synchr
     
     # Check if data shape is as expected
     if df.shape[1] % 3 != 0:
-        print(f"Unexpected number of columns in {csv}: {df.shape[1]}")
+        logger.warning("Unexpected number of columns in %s: %d", csv, df.shape[1])
         raise ValueError(f"wrong number of columns in csv {csv}")
     
     # Convert the df into a 4D numpy array of shape (num_frames, num_markers, 3) and append to dfs
