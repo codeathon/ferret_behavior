@@ -1,4 +1,4 @@
-import logging
+from src.utilities.logging_config import get_logger
 from functools import cached_property
 from typing import Any, Self
 
@@ -14,7 +14,7 @@ DEFAULT_MIN_CONFIDENCE: float = 0.3
 DEFAULT_BUTTERWORTH_CUTOFF: float = 6.0
 DEFAULT_BUTTERWORTH_ORDER: int = 4
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class Trajectory2D(FrozenABaseModel):

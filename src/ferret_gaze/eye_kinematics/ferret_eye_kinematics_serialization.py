@@ -21,7 +21,7 @@ NOT saved (can be recomputed from quaternions + reference geometry):
     - canonical keypoints (rotated reference geometry)
 """
 
-import logging
+from src.utilities.logging_config import get_logger
 from pathlib import Path
 
 import numpy as np
@@ -39,7 +39,7 @@ from src.ferret_gaze.eye_kinematics.ferret_eyeball_reference_geometry import (
 from src.kinematics_core.reference_geometry_model import ReferenceGeometry
 from src.kinematics_core.rigid_body_kinematics_model import RigidBodyKinematics
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 def _build_vector_chunk(

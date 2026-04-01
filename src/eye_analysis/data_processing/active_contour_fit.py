@@ -3,14 +3,14 @@
 Uses initial ellipse fit as starting point and deforms to find pupil boundary.
 """
 
-import logging
+from src.utilities.logging_config import get_logger
 import numpy as np
 import cv2
 from skimage.segmentation import active_contour
 from skimage.filters import gaussian
 from pydantic import BaseModel
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class SnakeParams(BaseModel):

@@ -1,6 +1,6 @@
 """Bundle adjustment optimization - optimize poses with FIXED reference geometry."""
 
-import logging
+from src.utilities.logging_config import get_logger
 
 import numpy as np
 import pyceres
@@ -12,7 +12,7 @@ from src.kinematics_core.quaternion_model import Quaternion
 from src.kinematics_core.reference_geometry_model import ReferenceGeometry
 from src.rigid_body_solver.core.calculate_reference_geometry import estimate_reference_geometry
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class OptimizationConfig(BaseModel):

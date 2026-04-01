@@ -1,4 +1,4 @@
-import logging
+from src.utilities.logging_config import get_logger
 from itertools import combinations
 
 import numpy as np
@@ -7,7 +7,7 @@ from numpy.typing import NDArray
 from src.kinematics_core.reference_geometry_model import MarkerPosition, CoordinateFrameDefinition, \
     AxisDefinition, AxisType, ReferenceGeometry
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 def define_body_frame(
     *,
