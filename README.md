@@ -63,7 +63,7 @@ uv run python -c "import cv2, torch, pandas, rerun; print('OK')"
 | Module | Purpose |
 |---|---|
 | `python_code/kinematics_core/` | Shared Pydantic data models for poses, quaternions, trajectories, and reference geometry. Library only — no entry points. |
-| `python_code/cameras/` | Basler multicamera acquisition, UTC timestamp sync, Pupil alignment, intrinsics calibration, and session postprocessing. |
+| `python_code/cameras/` | Basler multicamera acquisition, UTC timestamp sync, Pupil alignment, intrinsics calibration, and session postprocessing. Internally split into focused modules: `camera_config.py` (hardware config), `video_writers.py` (ffmpeg/OpenCV writers), `timestamp_utils.py` (latch/save), `grab_loops.py` (frame loop), `logging_config.py` (configurable logger). Run a session via `run_recording.py`. |
 | `python_code/video_viewing/` | Composite multi-camera video assembly, session clipping, and rotation/flip layout config. |
 | `python_code/eye_analysis/` | DLC eye trajectory loading, anatomical alignment, stabilized video export, and Plotly dashboards. |
 | `python_code/rigid_body_solver/` | Ceres-based rigid body fitting to 3D markers; outputs skull kinematics and reference geometry JSON. |
@@ -78,7 +78,11 @@ uv run python -c "import cv2, torch, pandas, rerun; print('OK')"
 ## 5. How to run each workflow
 
 ### Multicamera recording
-Open `python_code/cameras/multicamera_recording.py`, set `recording_name` and uncomment one grab mode (`grab_n_frames`, `grab_n_seconds`, or `grab_until_input`), then run. See `python_code/cameras/README.md` for full steps.
+Edit the `CONFIG` section at the top of `run_recording.py` (set `RECORDING_NAME`, `FPS`, `BINNING_FACTOR`, etc.), uncomment one grab mode, then run:
+```bash
+uv run python python_code/cameras/run_recording.py
+```
+See `python_code/cameras/README.md` for full operational steps.
 
 ### Pupil eye recording
 ```bash
@@ -155,7 +159,7 @@ Subprocess paths in `full_pipeline.py` default to `/home/scholl-lab/...` — upd
 
 ## 8. Known issues
 
-- Most `__main__` blocks contain hardcoded lab machine paths — update before running.
+- Most `__main__` blocks contain hardcoded lab machine paths — update before running. Exception: `cameras/run_recording.py` now has a dedicated `CONFIG` section at the top for this.
 - `cube_solver_demo.py` imports stale APIs that no longer exist.
 - Left/right eye assignment in `run_gaze_pipeline.py` is keyed to ferret ID `"757"` in the path string.
 - No pytest config or CI test gate exists.

@@ -1,29 +1,105 @@
 # Cameras
 
-## Multicamera Recording
-1. Go to VSCode and it should be open to the repo `bs`
-2. In the file menu (top left) navigate to `python_code/cameras/multicamera_recording.py` and click it, then scroll all the way to the bottom where it says `if name==“main”:`
-3. Change the recording name variable so match the naming Schema you want. If this is the first recording of the day, or you have touched the cameras at all, they need to be recalibrated.
-4. Once you have the name you want, scroll down to where there are multiple grab options. All but one should be commented out. The options are:
-    - `grab_n_frames`, which will grab the exact number of frames you input. 
-    - `grab_n_seconds` will grab for the amount of time you input. If you want a 20 minutes recording, input `20*60`. 
-    - `grab_until_input` will run iuntil you type enter in the terminal at the bottom of backed. This is useful for recording where you start Basler and and pupil, let it run until you’ve collected the data you need, and then stop both manually 
-5. Click the run button in the upper right.
-6. The recording will be saved to `/home/scholl-lab/recordings` inside a session folder for that day.
+Basler multi-camera acquisition, UTC timestamp synchronization, Pupil eye tracking alignment, and session postprocessing.
 
-## Pupil Recording
+## Module structure
 
-1. Open a new terminal
-2. Run `conda activate pupil_source`
-3. Run `cd Documents/git_repos/pupil/pupil_src`
-4. Run `python main.py capture`
-5. The pupil gui will open, and if they eye cameras don't automatically open go to settings and click `detect eye 0` and `detect eye 1` 
-6. Change the recording name under `Recorder: Recording session name`
-7. You can record by pressing the R on screen or hitting `r` on the keyboard
-8. Repeat whatever command from `7` to stop recording. 
-9. Recordings are saved to `/home/scholl-lab/pupil_recordings`  
+After the `camera_restructure` refactor, the acquisition code is split across focused files:
 
-## Synchronizing Basler
+| File | Responsibility |
+|---|---|
+| `run_recording.py` | **Operator entry point.** Edit the `CONFIG` block at the top, then run this file. |
+| `multicamera_recording.py` | `MultiCameraRecording` orchestrator class. Wires everything together; public API unchanged. |
+| `camera_config.py` | `ImageShape`, per-serial default resolution/exposure/gain tables, `configure_all_cameras()`. |
+| `video_writers.py` | `VideoWriterManager` — ffmpeg and OpenCV writer backends, pipe tuning. |
+| `timestamp_utils.py` | `latch_timestamp_mapping()`, `trim_timestamp_zeros()`, `save_timestamps()`. |
+| `grab_loops.py` | `GrabLoopRunner` — frame retrieval loop and the three grab modes. |
+| `logging_config.py` | `get_camera_logger()` — file + console logger with graceful fallback. |
+| `postprocess.py` | Post-recording sync, file moves, and `combine_videos` call. |
+| `synchronization/` | Timestamp synchronization across Basler and Pupil streams. |
+| `intrinsics/` | Per-camera lens calibration and distortion correction. |
+| `diagnostics/` | Timestamp plotting and file exploration tools. |
+
+---
+
+## Multicamera recording
+
+1. Open `python_code/cameras/run_recording.py` in VSCode/Cursor.
+2. Edit the **`CONFIG`** section near the top:
+   - `RECORDING_NAME` — set to match your naming schema (e.g. `ferret_416_P51_E12`). If this is a calibration session use `"calibration"`.
+   - `FPS` — acquisition frame rate (default `90`).
+   - `BINNING_FACTOR` — `1` for full resolution, `2` for half (default `2`).
+   - `HARDWARE_TRIGGER` — `True` if cameras are slaved to an external TTL trigger.
+   - `NIR_ONLY` — `True` to record only NIR cameras; `False` for all selected cameras.
+3. Uncomment **exactly one** grab mode at the bottom of `main()`:
+   - `grab_n_frames(n)` — record exactly n frames on every camera.
+   - `grab_n_seconds(t)` — record for t seconds (e.g. `2.5 * 60` for 2.5 minutes).
+   - `grab_until_input()` — record until you press Enter in the terminal. Use this when running Basler and Pupil together and stopping both manually.
+4. Run the file:
+   ```bash
+   uv run python python_code/cameras/run_recording.py
+   ```
+   or press the **Run** button in VSCode/Cursor.
+5. Recordings are saved to `/home/scholl-lab/recordings/<session_date>/<RECORDING_NAME>/raw_videos/`.
+
+> **Recalibrate** if it is the first recording of the day or any camera has been moved.
+
+---
+
+## Pupil eye recording
+
+1. Open a new terminal.
+2. Run:
+   ```bash
+   conda activate pupil_source
+   cd Documents/git_repos/pupil/pupil_src
+   python main.py capture
+   ```
+3. The Pupil GUI will open. If eye cameras do not appear automatically, go to **Settings → Detect Eye 0 / Detect Eye 1**.
+4. Set the recording name under **`Recorder: Recording session name`** — use the same name as the Basler `RECORDING_NAME`.
+5. Press `R` on screen or `r` on the keyboard to start/stop recording.
+6. Recordings are saved to `/home/scholl-lab/pupil_recordings`.
+
+---
+
+## Synchronizing Basler and Pupil
+
+After both recordings are complete, run postprocessing to align timestamps and move files into the standard session layout:
+
+```bash
+uv run python python_code/cameras/postprocess.py
+```
+
+This calls `TimestampSynchronize`, `TimestampConverter`, and `combine_videos` to produce the `full_recording/` directory structure expected by the rest of the pipeline.
+
+---
+
+## Camera configuration
+
+Per-camera exposure, gain, and resolution defaults live in `camera_config.py`:
+
+```python
+# camera_config.py
+SERIAL_TO_EXPOSURE_GAIN = {
+    "24908831": (5000, 1.0),
+    "24908832": (5000, 0.0),
+    ...
+}
+```
+
+To override defaults for a session, pass the `overrides` argument in `run_recording.py`:
+
+```python
+configure_all_cameras(
+    camera_array=mcr.camera_array,
+    devices=mcr.devices,
+    overrides={"24908831": (3000, 2.0)},  # custom exposure + gain for one camera
+)
+```
+
+---
 
 ## Resources
-Some more good info on using pypylon: https://pythonforthelab.com/blog/getting-started-with-basler-cameras/
+
+- pypylon getting started: https://pythonforthelab.com/blog/getting-started-with-basler-cameras/
+- Basler camera parameter reference: https://docs.baslerweb.com/pylonapi/net/T_Basler_Pylon_PLCamera
