@@ -34,7 +34,7 @@ End-to-end research pipeline for ferret multi-camera recording, pose reconstruct
 
 ```
 bs/
-├── python_code/          # All source code (see Module reference)
+├── src/          # All source code (see Module reference)
 ├── tests/                # pytest unit test suite (cameras, kinematics, gaze, batch)
 ├── Writerside/           # JetBrains Writerside knowledge-base docs
 ├── notes/                # Research notes and planning
@@ -63,16 +63,16 @@ uv run python -c "import cv2, torch, pandas, rerun; print('OK')"
 
 | Module | Purpose |
 |---|---|
-| `python_code/kinematics_core/` | Shared Pydantic data models for poses, quaternions, trajectories, and reference geometry. Library only — no entry points. |
-| `python_code/cameras/` | Basler multicamera acquisition, UTC timestamp sync, Pupil alignment, intrinsics calibration, and session postprocessing. Internally split into focused modules: `camera_config.py` (hardware config), `video_writers.py` (ffmpeg/OpenCV writers), `timestamp_utils.py` (latch/save), `grab_loops.py` (frame loop), `logging_config.py` (configurable logger). Run a session via `run_recording.py`. |
-| `python_code/video_viewing/` | Composite multi-camera video assembly, session clipping, and rotation/flip layout config. |
-| `python_code/eye_analysis/` | DLC eye trajectory loading, anatomical alignment, stabilized video export, and Plotly dashboards. |
-| `python_code/rigid_body_solver/` | Ceres-based rigid body fitting to 3D markers; outputs skull kinematics and reference geometry JSON. |
-| `python_code/ferret_gaze/` | Full gaze pipeline: eye kinematics → resampling → gaze computation → Rerun/Blender visualization. Each stage is idempotent. |
-| `python_code/rerun_viewer/` | Rerun viewer apps for interactive inspection of videos, 3D markers, gaze, and eye traces at any pipeline stage. |
-| `python_code/batch_processing/` | Session-level orchestration: runs sync, calibration, DLC, triangulation, and postprocessing in sequence; batch progress dashboard. |
-| `python_code/utilities/` | `RecordingFolder` path model and pipeline-stage validation helpers used across the whole codebase. |
-| `python_code/old/` | Archived/experimental code. Do not import from here. |
+| `src/kinematics_core/` | Shared Pydantic data models for poses, quaternions, trajectories, and reference geometry. Library only — no entry points. |
+| `src/cameras/` | Basler multicamera acquisition, UTC timestamp sync, Pupil alignment, intrinsics calibration, and session postprocessing. Internally split into focused modules: `camera_config.py` (hardware config), `video_writers.py` (ffmpeg/OpenCV writers), `timestamp_utils.py` (latch/save), `grab_loops.py` (frame loop), `logging_config.py` (configurable logger). Run a session via `run_recording.py`. |
+| `src/video_viewing/` | Composite multi-camera video assembly, session clipping, and rotation/flip layout config. |
+| `src/eye_analysis/` | DLC eye trajectory loading, anatomical alignment, stabilized video export, and Plotly dashboards. |
+| `src/rigid_body_solver/` | Ceres-based rigid body fitting to 3D markers; outputs skull kinematics and reference geometry JSON. |
+| `src/ferret_gaze/` | Full gaze pipeline: eye kinematics → resampling → gaze computation → Rerun/Blender visualization. Each stage is idempotent. |
+| `src/rerun_viewer/` | Rerun viewer apps for interactive inspection of videos, 3D markers, gaze, and eye traces at any pipeline stage. |
+| `src/batch_processing/` | Session-level orchestration: runs sync, calibration, DLC, triangulation, and postprocessing in sequence; batch progress dashboard. |
+| `src/utilities/` | `RecordingFolder` path model and pipeline-stage validation helpers used across the whole codebase. |
+| `src/old/` | Archived/experimental code. Do not import from here. |
 
 ---
 
@@ -81,9 +81,9 @@ uv run python -c "import cv2, torch, pandas, rerun; print('OK')"
 ### Multicamera recording
 Edit the `CONFIG` section at the top of `run_recording.py` (set `RECORDING_NAME`, `FPS`, `BINNING_FACTOR`, etc.), uncomment one grab mode, then run:
 ```bash
-uv run python python_code/cameras/run_recording.py
+uv run python src/cameras/run_recording.py
 ```
-See `python_code/cameras/README.md` for full operational steps.
+See `src/cameras/README.md` for full operational steps.
 
 ### Pupil eye recording
 ```bash
@@ -94,21 +94,21 @@ python main.py capture
 ### Full session pipeline
 Edit the path in `__main__` of `full_pipeline.py`, then:
 ```bash
-uv run python python_code/batch_processing/full_pipeline.py
+uv run python src/batch_processing/full_pipeline.py
 ```
 Pass `overwrite_*` booleans to re-run specific stages (sync, calibration, DLC, triangulation, eye/skull/gaze postprocessing).
 
 ### Clip-level gaze pipeline
 Edit the clip path in `__main__` of `run_gaze_pipeline.py`, then:
 ```bash
-uv run python python_code/ferret_gaze/run_gaze_pipeline.py
+uv run python src/ferret_gaze/run_gaze_pipeline.py
 ```
 Pass `reprocess_all=True` or individual `reprocess_*` flags to force specific stages.
 
 ### Rerun viewers
 ```bash
-uv run python python_code/rerun_viewer/everything_viewer.py
-uv run python python_code/rerun_viewer/eyes_and_head_rotation.py
+uv run python src/rerun_viewer/everything_viewer.py
+uv run python src/rerun_viewer/eyes_and_head_rotation.py
 ```
 
 ### Blender visualization
@@ -116,7 +116,7 @@ After the gaze pipeline runs, open `analyzable_output/ferret_full_gaze_blender_v
 
 ### Batch progress check
 ```bash
-uv run python python_code/batch_processing/check_progress/check_progress.py
+uv run python src/batch_processing/check_progress/check_progress.py
 ```
 
 ### Running the test suite
@@ -187,4 +187,4 @@ Subprocess paths in `full_pipeline.py` default to `/home/scholl-lab/...` — upd
 
 ---
 
-Further reading: `docs/onboarding.md` · `python_code/cameras/README.md` · `Writerside/`
+Further reading: `docs/onboarding.md` · `src/cameras/README.md` · `Writerside/`

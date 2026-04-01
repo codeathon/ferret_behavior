@@ -1,5 +1,5 @@
 """
-Tests for python_code/ferret_gaze/
+Tests for src/ferret_gaze/
 
 This module tests the gaze pipeline orchestration and its idempotency logic:
 
@@ -20,8 +20,8 @@ import pytest
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 
-from python_code.ferret_gaze.run_gaze_pipeline import ClipPaths
-from python_code.ferret_gaze.data_resampling.data_resampling_helpers import ResamplingStrategy
+from src.ferret_gaze.run_gaze_pipeline import ClipPaths
+from src.ferret_gaze.data_resampling.data_resampling_helpers import ResamplingStrategy
 
 
 # =============================================================================
@@ -144,12 +144,12 @@ class TestGazePipelineSkipLogic:
 
     def _patch_all_stages(self):
         return [
-            patch("python_code.ferret_gaze.run_gaze_pipeline.calculate_eye_kinematics"),
-            patch("python_code.ferret_gaze.run_gaze_pipeline.build_video_configs", return_value=[]),
-            patch("python_code.ferret_gaze.run_gaze_pipeline.resample_all_data"),
-            patch("python_code.ferret_gaze.run_gaze_pipeline.calculate_gaze"),
-            patch("python_code.ferret_gaze.run_gaze_pipeline.generate_blender_script"),
-            patch("python_code.ferret_gaze.run_gaze_pipeline.ClipPaths.validate_inputs"),
+            patch("src.ferret_gaze.run_gaze_pipeline.calculate_eye_kinematics"),
+            patch("src.ferret_gaze.run_gaze_pipeline.build_video_configs", return_value=[]),
+            patch("src.ferret_gaze.run_gaze_pipeline.resample_all_data"),
+            patch("src.ferret_gaze.run_gaze_pipeline.calculate_gaze"),
+            patch("src.ferret_gaze.run_gaze_pipeline.generate_blender_script"),
+            patch("src.ferret_gaze.run_gaze_pipeline.ClipPaths.validate_inputs"),
         ]
 
     def _populate_all_outputs(self, paths: ClipPaths):
@@ -180,15 +180,15 @@ class TestGazePipelineSkipLogic:
         paths.blender_script_path.write_text("# blender")
 
     def test_all_stages_skipped_when_outputs_exist(self, tmp_path):
-        from python_code.ferret_gaze.run_gaze_pipeline import run_gaze_pipeline
+        from src.ferret_gaze.run_gaze_pipeline import run_gaze_pipeline
         paths = ClipPaths(clip_path=tmp_path)
         self._populate_all_outputs(paths)
 
-        with patch("python_code.ferret_gaze.run_gaze_pipeline.calculate_eye_kinematics") as mock_eye, \
-             patch("python_code.ferret_gaze.run_gaze_pipeline.resample_all_data") as mock_resample, \
-             patch("python_code.ferret_gaze.run_gaze_pipeline.calculate_gaze") as mock_gaze, \
-             patch("python_code.ferret_gaze.run_gaze_pipeline.generate_blender_script") as mock_blender, \
-             patch("python_code.ferret_gaze.run_gaze_pipeline.ClipPaths.validate_inputs"):
+        with patch("src.ferret_gaze.run_gaze_pipeline.calculate_eye_kinematics") as mock_eye, \
+             patch("src.ferret_gaze.run_gaze_pipeline.resample_all_data") as mock_resample, \
+             patch("src.ferret_gaze.run_gaze_pipeline.calculate_gaze") as mock_gaze, \
+             patch("src.ferret_gaze.run_gaze_pipeline.generate_blender_script") as mock_blender, \
+             patch("src.ferret_gaze.run_gaze_pipeline.ClipPaths.validate_inputs"):
             run_gaze_pipeline(recording_path=tmp_path)
 
         mock_eye.assert_not_called()
@@ -197,16 +197,16 @@ class TestGazePipelineSkipLogic:
         mock_blender.assert_not_called()
 
     def test_reprocess_all_calls_all_stages(self, tmp_path):
-        from python_code.ferret_gaze.run_gaze_pipeline import run_gaze_pipeline
+        from src.ferret_gaze.run_gaze_pipeline import run_gaze_pipeline
         paths = ClipPaths(clip_path=tmp_path)
         self._populate_all_outputs(paths)
 
-        with patch("python_code.ferret_gaze.run_gaze_pipeline.calculate_eye_kinematics") as mock_eye, \
-             patch("python_code.ferret_gaze.run_gaze_pipeline.build_video_configs", return_value=[]) as mock_vids, \
-             patch("python_code.ferret_gaze.run_gaze_pipeline.resample_all_data") as mock_resample, \
-             patch("python_code.ferret_gaze.run_gaze_pipeline.calculate_gaze") as mock_gaze, \
-             patch("python_code.ferret_gaze.run_gaze_pipeline.generate_blender_script") as mock_blender, \
-             patch("python_code.ferret_gaze.run_gaze_pipeline.ClipPaths.validate_inputs"):
+        with patch("src.ferret_gaze.run_gaze_pipeline.calculate_eye_kinematics") as mock_eye, \
+             patch("src.ferret_gaze.run_gaze_pipeline.build_video_configs", return_value=[]) as mock_vids, \
+             patch("src.ferret_gaze.run_gaze_pipeline.resample_all_data") as mock_resample, \
+             patch("src.ferret_gaze.run_gaze_pipeline.calculate_gaze") as mock_gaze, \
+             patch("src.ferret_gaze.run_gaze_pipeline.generate_blender_script") as mock_blender, \
+             patch("src.ferret_gaze.run_gaze_pipeline.ClipPaths.validate_inputs"):
             run_gaze_pipeline(recording_path=tmp_path, reprocess_all=True)
 
         mock_eye.assert_called_once()

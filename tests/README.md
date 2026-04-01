@@ -99,7 +99,7 @@ uv run pytest -k "camera or timestamp"
 - External subprocess tools (`skellyclicker`, `dlc_to_3d`, `freemocap`)
 - Full numerical correctness of the Ceres solver (requires hardware)
 - Live camera acquisition (actual pypylon grab loops, real ffmpeg pipes) — requires Basler hardware
-- `python_code/old/` — archived code
+- `src/old/` — archived code
 
 ## Adding new tests
 

@@ -1,5 +1,5 @@
 """
-Tests for python_code/utilities/
+Tests for src/utilities/
 
 This module tests the RecordingFolder path model and its pipeline-stage
 validation methods. RecordingFolder is the central hub that batch_processing,
@@ -20,7 +20,7 @@ import pytest
 from pathlib import Path
 from unittest.mock import MagicMock
 
-from python_code.utilities.folder_utilities.recording_folder import (
+from src.utilities.folder_utilities.recording_folder import (
     RecordingFolder,
     PipelineStep,
 )

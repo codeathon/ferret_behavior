@@ -13,15 +13,15 @@ import json
 import numpy as np
 import pytest
 
-from python_code.kinematics_core.reference_geometry_model import (
+from src.kinematics_core.reference_geometry_model import (
     AxisDefinition,
     AxisType,
     CoordinateFrameDefinition,
     MarkerPosition,
     ReferenceGeometry,
 )
-from python_code.kinematics_core.rigid_body_kinematics_model import RigidBodyKinematics
-from python_code.kinematics_core.quaternion_model import Quaternion
+from src.kinematics_core.rigid_body_kinematics_model import RigidBodyKinematics
+from src.kinematics_core.quaternion_model import Quaternion
 
 
 # ---------------------------------------------------------------------------

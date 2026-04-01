@@ -30,12 +30,12 @@ If dependency resolution fails, check:
 
 Core code directories:
 
-- `python_code/cameras/`: recording, synchronization, camera postprocess
-- `python_code/batch_processing/`: end-to-end session orchestration
-- `python_code/ferret_gaze/`: gaze and resampling pipeline
-- `python_code/kinematics_core/`: geometry and kinematic models
-- `python_code/rigid_body_solver/`: rigid-body solver utilities
-- `python_code/rerun_viewer/`: visual inspection and debug scripts
+- `src/cameras/`: recording, synchronization, camera postprocess
+- `src/batch_processing/`: end-to-end session orchestration
+- `src/ferret_gaze/`: gaze and resampling pipeline
+- `src/kinematics_core/`: geometry and kinematic models
+- `src/rigid_body_solver/`: rigid-body solver utilities
+- `src/rerun_viewer/`: visual inspection and debug scripts
 
 Docs and planning:
 
@@ -46,7 +46,7 @@ Docs and planning:
 
 ### A) Full session pipeline
 
-Primary script: `python_code/batch_processing/full_pipeline.py`
+Primary script: `src/batch_processing/full_pipeline.py`
 
 What it orchestrates:
 
@@ -59,7 +59,7 @@ What it orchestrates:
 Run with:
 
 ```bash
-uv run python python_code/batch_processing/full_pipeline.py
+uv run python src/batch_processing/full_pipeline.py
 ```
 
 Important:
@@ -70,7 +70,7 @@ Important:
 
 ### B) Clip-level ferret gaze pipeline
 
-Primary script: `python_code/ferret_gaze/run_gaze_pipeline.py`
+Primary script: `src/ferret_gaze/run_gaze_pipeline.py`
 
 What it does:
 
@@ -82,7 +82,7 @@ What it does:
 Run with:
 
 ```bash
-uv run python python_code/ferret_gaze/run_gaze_pipeline.py
+uv run python src/ferret_gaze/run_gaze_pipeline.py
 ```
 
 Important:
@@ -93,15 +93,15 @@ Important:
 
 ### C) Camera acquisition workflow
 
-- Camera notes and operational flow are in `python_code/cameras/README.md`.
-- Entry script is generally `python_code/cameras/multicamera_recording.py`.
+- Camera notes and operational flow are in `src/cameras/README.md`.
+- Entry script is generally `src/cameras/multicamera_recording.py`.
 
 ## 5) Suggested first-day validation
 
 Use this checklist after environment setup:
 
 1. `uv run python -c "import cv2, pandas, torch; print('deps ok')"`
-2. Open `python_code/ferret_gaze/run_gaze_pipeline.py` and inspect expected input paths.
+2. Open `src/ferret_gaze/run_gaze_pipeline.py` and inspect expected input paths.
 3. Run one small test clip end-to-end.
 4. Confirm `analyzable_output/gaze_kinematics/` files are generated.
 5. Validate generated Blender script path and run it in Blender.
@@ -131,6 +131,6 @@ Recommendation: create a small local wrapper script that passes all runtime path
 ## 8) Where to go deeper
 
 - High-level docs tree: `Writerside/bs.tree`
-- Camera workflow details: `python_code/cameras/README.md`
-- Gaze pipeline code: `python_code/ferret_gaze/run_gaze_pipeline.py`
-- Session pipeline code: `python_code/batch_processing/full_pipeline.py`
+- Camera workflow details: `src/cameras/README.md`
+- Gaze pipeline code: `src/ferret_gaze/run_gaze_pipeline.py`
+- Session pipeline code: `src/batch_processing/full_pipeline.py`
