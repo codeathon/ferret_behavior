@@ -2,6 +2,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 from pathlib import Path
 
+from src.utilities.logging_config import get_logger
+
+logger = get_logger(__name__)
+
+
 def plot_timestamps(timestamps: np.ndarray, save_path: Path | None = None):
     num_cameras = timestamps.shape[0]
 
@@ -29,6 +34,6 @@ if __name__ == "__main__":
 
     timestamps /= 1e9
 
-    print(f"timestamps shape: {timestamps.shape}")
+    logger.info("timestamps shape: %s", timestamps.shape)
 
     plot_timestamps(timestamps=timestamps, save_path = timestamp_path.parent / "timestamp_plot.png")

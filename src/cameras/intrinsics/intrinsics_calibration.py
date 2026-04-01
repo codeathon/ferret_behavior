@@ -4,6 +4,10 @@ import json
 import numpy as np
 from skellytracker.trackers.charuco_tracker.charuco_tracker import CharucoTracker
 
+from src.utilities.logging_config import get_logger
+
+logger = get_logger(__name__)
+
 np.set_printoptions(suppress=True)
 
 # flag definitions -> https://docs.opencv.org/4.x/d9/d0c/group__calib3d.html#ga3207604e4b1a1758aa66acb6ed5aa65d
@@ -53,7 +57,7 @@ def save_corrected_video(
     camera_matrix: np.ndarray,
     dist_coeffs: np.ndarray,
 ):
-    print("Saving corrected video...")
+    logger.info("Saving corrected video...")
     cap = cv2.VideoCapture(str(input_video_path))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -87,7 +91,7 @@ def save_corrected_video(
     cap.release()
     out.release()
 
-    print(f"Corrected video saved to {output_video_path}")
+    logger.info("Corrected video saved to %s", output_video_path)
 
 
 def run_intrinsics(input_video_path: Path, output_video_path: Path, charuco_tracker: CharucoTracker = setup_7x5_tracker()):
@@ -138,26 +142,26 @@ def run_intrinsics(input_video_path: Path, output_video_path: Path, charuco_trac
             )
 
             if not current_image_points.any() or not current_object_points.any():
-                print(f"Point matching failed for frame {frame_number}.")
+                logger.warning("Point matching failed for frame %d.", frame_number)
             else:
-                print(f"Frame captured: {frame_number}")
+                logger.debug("Frame captured: %d", frame_number)
 
                 all_charuco_corners.append(current_charuco_corners)
                 all_charuco_ids.append(current_charuco_ids)
                 all_image_points.append(current_image_points)
                 all_object_points.append(current_object_points)
 
-    print("Debugging Info")
-    print(f"\tlength of all_charuco_corners: {len(all_charuco_corners)}")
-    print(f"\tlength of all_charuco_ids: {len(all_charuco_ids)}")
-    print(f"\tlength of all_image_points: {len(all_image_points)}")
-    print(f"\tlength of all_object_points: {len(all_object_points)}")
+    logger.debug(
+        "Debugging Info — corners: %d, ids: %d, image_pts: %d, object_pts: %d",
+        len(all_charuco_corners), len(all_charuco_ids),
+        len(all_image_points), len(all_object_points),
+    )
 
     # TODO: filter for "better" views of the charuco somehow, and possibly filter for "most different" views to get variety
 
     if len(all_object_points) > 1000:
         sample = (len(all_object_points) // 1000) + 1
-        print(f"Too many frames captured, sampling every {sample} frames")
+        logger.warning("Too many frames captured, sampling every %d frames", sample)
         all_object_points = all_object_points[:1000]
         all_image_points = all_image_points[:1000]
 
@@ -172,8 +176,8 @@ def run_intrinsics(input_video_path: Path, output_video_path: Path, charuco_trac
 
     distortion_coefficients = distortion_coefficients[0]
 
-    print(f"Camera matrix: {camera_matrix}")
-    print(f"Distortion coefficients: {distortion_coefficients}")
+    logger.info("Camera matrix: %s", camera_matrix)
+    logger.info("Distortion coefficients: %s", distortion_coefficients)
 
     calibration_data = {
         "camera_matrix": camera_matrix.tolist(),

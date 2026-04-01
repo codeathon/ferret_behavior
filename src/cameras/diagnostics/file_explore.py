@@ -6,6 +6,9 @@ from pathlib import Path
 from datetime import datetime
 
 from skellycam_plots import create_timestamp_diagnostic_plots, timestamps_array_to_dictionary
+from src.utilities.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 Z_SCORE_95_CI = 1.96
 
@@ -23,11 +26,11 @@ def print_video_info(folder_path: Path):
 
     synched_videos_path = folder_path / "synchronized_videos"
 
-    print("Raw Video Information:")
+    logger.info("Raw Video Information:")
     print_basic_info(raw_videos_path)
 
     if synched_videos_path.exists():
-        print("Synchronized Video Information:")
+        logger.info("Synchronized Video Information:")
         print_basic_info(synched_videos_path)
 
 
@@ -37,14 +40,14 @@ def print_basic_info(folder_path: Path):
     for video_path in folder_path.iterdir():
         if video_path.suffix not in {".avi", ".AVI", ".mp4", ".MP4"}:
             continue
-        print(f"\tvideo name: {video_path.name}")
+        logger.info("  video name: %s", video_path.name)
         cap = cv2.VideoCapture(str(video_path))
-        print(f"\tframe count: {cap.get(cv2.CAP_PROP_FRAME_COUNT)}")
-        print(f"\treported fps: {cap.get(cv2.CAP_PROP_FPS)}")
+        logger.info("  frame count: %s", cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        logger.info("  reported fps: %s", cap.get(cv2.CAP_PROP_FPS))
         ffprobe_fps = get_ffprobe_fps(
             video_path
         )
-        print(f"ffprobe fps: {ffprobe_fps}")
+        logger.info("  ffprobe fps: %s", ffprobe_fps)
         cap.release()
 
 def print_timestamp_info(raw_video_path: Path, synched_video_path: Path):
@@ -64,7 +67,7 @@ def print_timestamp_info(raw_video_path: Path, synched_video_path: Path):
     if raw_timestamps_path.exists():
         if not synched_timestamps_path.exists():
             synched_timestamp_dict = None
-        print(f"Creating timestamp diagnostic plots, will save to: {synched_video_path.parent / "timestamp_diagnostic_plot.png"}")
+        logger.info("Creating timestamp diagnostic plots, will save to: %s", synched_video_path.parent / "timestamp_diagnostic_plot.png")
         create_timestamp_diagnostic_plots(
             raw_timestamp_dictionary=raw_timestamp_dict,
             synchronized_timestamp_dictionary=synched_timestamp_dict,
@@ -72,7 +75,7 @@ def print_timestamp_info(raw_video_path: Path, synched_video_path: Path):
         )
 
 def print_timestamp_statistics(timestamps: np.ndarray):
-    print(f"shape of timestamps: {timestamps.shape}")
+    logger.info("shape of timestamps: %s", timestamps.shape)
     starting_time = np.min(timestamps)
 
     by_camera_fps = []
@@ -86,31 +89,31 @@ def print_timestamp_statistics(timestamps: np.ndarray):
         by_camera_fps.append(fps)
         by_camera_frame_duration.append(mean_frame_duration)
         units = "seconds"
-        print(f"cam {i} Descriptive Statistics:")
-        print(f"\tEarliest Timestamp: {np.min(samples):.3f} {units}")
-        print(f"\tLatest Timestamp: {np.max(samples):.3f} {units}")
-        print(f"\tFPS: {fps}")
-        print(f"\tMean Frame Duration for Camera: {mean_frame_duration} ms")
+        logger.info("cam %d Descriptive Statistics:", i)
+        logger.debug("  Earliest Timestamp: %.3f %s", np.min(samples), units)
+        logger.debug("  Latest Timestamp:   %.3f %s", np.max(samples), units)
+        logger.info("  FPS: %s", fps)
+        logger.info("  Mean Frame Duration: %s ms", mean_frame_duration)
 
-    print("Overall FPS and Mean Frame Duration")
-    print(f"\tMean Overall FPS: {np.nanmean(by_camera_fps)}")
-    print(f"\tMean Overall Mean Frame Duration: {np.nanmean(by_camera_frame_duration)}")
+    logger.info("Overall FPS and Mean Frame Duration")
+    logger.info("  Mean Overall FPS: %s", np.nanmean(by_camera_fps))
+    logger.info("  Mean Overall Mean Frame Duration: %s", np.nanmean(by_camera_frame_duration))
 
     for i in range(0, timestamps.shape[1]-1, 15):
         num_samples = timestamps.shape[0]
         samples = (timestamps[:, i] - starting_time) / 1e9
         units = "seconds"
-        print(f"frame {i} Descriptive Statistics")
-        print(f"\tNumber of Samples: {num_samples} {units}")
-        print(f"\tMean: {np.nanmean(samples):.3f} {units}")
-        print(f"\tMedian: {np.nanmedian(samples):.3f} {units}")
-        print(f"\tStandard Deviation: {np.nanstd(samples):.3f} {units}")
-        print(f"\tMedian Absolute Deviation: {np.nanmedian(np.abs(samples - np.nanmedian(samples))):.3f} {units}")
-        print(f"\tInterquartile Range: {np.nanpercentile(samples, 75) - np.nanpercentile(samples, 25):.3f} {units}")
-        print(f"\t95% Confidence Interval: {(Z_SCORE_95_CI * np.nanstd(samples) / (num_samples**0.5)):.3f} {units}")
-        print(f"\tEarliest Timestamp: {np.min(samples):.3f}")
-        print(f"\tLatest Timestamp: {np.max(samples):.3f}") 
-        print(f"\tMean Frame Duration for Camera: {np.nanmean(timestamps[:, i+1] - timestamps[:, i]) / 1e6} ms")
+        logger.debug("frame %d Descriptive Statistics", i)
+        logger.debug("  Number of Samples: %d %s", num_samples, units)
+        logger.debug("  Mean:   %.3f %s", np.nanmean(samples), units)
+        logger.debug("  Median: %.3f %s", np.nanmedian(samples), units)
+        logger.debug("  Std Dev: %.3f %s", np.nanstd(samples), units)
+        logger.debug("  Median Absolute Deviation: %.3f %s", np.nanmedian(np.abs(samples - np.nanmedian(samples))), units)
+        logger.debug("  IQR: %.3f %s", np.nanpercentile(samples, 75) - np.nanpercentile(samples, 25), units)
+        logger.debug("  95%% CI: %.3f %s", Z_SCORE_95_CI * np.nanstd(samples) / (num_samples**0.5), units)
+        logger.debug("  Earliest Timestamp: %.3f", np.min(samples))
+        logger.debug("  Latest Timestamp:   %.3f", np.max(samples))
+        logger.debug("  Mean Frame Duration: %s ms", np.nanmean(timestamps[:, i+1] - timestamps[:, i]) / 1e6)
 
 
 def get_ffprobe_fps(video_path: Path) -> float:
@@ -129,7 +132,7 @@ def get_ffprobe_fps(video_path: Path) -> float:
         stderr=subprocess.STDOUT,
     )
     duration = duration_subprocess.stdout
-    print(f"duration from ffprobe: {float(duration)} seconds")
+    logger.debug("duration from ffprobe: %s seconds", float(duration))
 
     frame_count_subprocess = subprocess.run(
         [
@@ -151,7 +154,7 @@ def get_ffprobe_fps(video_path: Path) -> float:
 
     frame_count = int(frame_count_subprocess.stdout)
 
-    print(f"frame count from ffprobe: {frame_count}")
+    logger.debug("frame count from ffprobe: %d", frame_count)
 
     return frame_count / float(duration)
 

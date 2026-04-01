@@ -3,6 +3,11 @@ import numpy as np
 import time
 from datetime import datetime
 
+from src.utilities.logging_config import get_logger
+
+logger = get_logger(__name__)
+
+
 def test_codec(codec_name, fourcc, file_extension):
     width = 1024
     height = 1024
@@ -28,8 +33,7 @@ def test_codec(codec_name, fourcc, file_extension):
     
     elapsed_time = time.time() - start_time
     fps = frames_written / elapsed_time
-    print(f"{codec_name}: {fps} FPS")
-    print(elapsed_time)
+    logger.info("%s: %.1f FPS (elapsed: %.2fs)", codec_name, fps, elapsed_time)
     
     return fps
 

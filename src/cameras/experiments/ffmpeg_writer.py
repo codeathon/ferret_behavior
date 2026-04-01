@@ -1,12 +1,9 @@
-import logging, sys, time, cv2, ffmpeg, numpy
+import sys, time, cv2, ffmpeg, numpy
 import fcntl
 
-logger = logging.getLogger("Writer")
-logger.setLevel("INFO")
-formatter = logging.Formatter("%(asctime)s %(levelname)-8s %(module)s %(message)s")
-handler = logging.StreamHandler(sys.stdout)
-handler.setFormatter(formatter)
-logger.addHandler(handler)
+from src.utilities.logging_config import get_logger
+
+logger = get_logger(__name__)
 videoCapture = cv2.VideoCapture('/home/scholl-lab/recordings/session_2025-06-06/framerate_testing__1/raw_videos/24908831.mp4')
 process = (
     ffmpeg
@@ -17,9 +14,9 @@ process = (
 )
 fd = process.stdin.fileno()
 pipe_size = 200000000
-print(fcntl.fcntl(fd, fcntl.F_GETPIPE_SZ))
+logger.info("pipe size before: %d", fcntl.fcntl(fd, fcntl.F_GETPIPE_SZ))
 fcntl.fcntl(fd, fcntl.F_SETPIPE_SZ, pipe_size)
-print(fcntl.fcntl(fd, fcntl.F_GETPIPE_SZ))
+logger.info("pipe size after:  %d", fcntl.fcntl(fd, fcntl.F_GETPIPE_SZ))
 process.stdin.close()
 process.wait()
 # lastFrame = False
