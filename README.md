@@ -34,13 +34,13 @@ End-to-end research pipeline for ferret multi-camera recording, pose reconstruct
 
 ```
 bs/
-├── src/          # All source code (see Module reference)
-├── tests/                # pytest unit test suite (cameras, kinematics, gaze, batch)
-├── Writerside/           # JetBrains Writerside knowledge-base docs
-├── notes/                # Research notes and planning
-├── docs/                 # Onboarding guide
-├── pyproject.toml        # Dependencies and uv config
-└── uv.lock               # Pinned lockfile
+├── src/               # All source code (see Module reference)
+├── tests/             # pytest unit test suite (cameras, kinematics, gaze, batch)
+├── Writerside/        # JetBrains Writerside knowledge-base docs
+├── notes/             # Research notes and planning
+├── docs/              # Onboarding guide
+├── pyproject.toml     # Dependencies and uv config
+└── uv.lock            # Pinned lockfile
 ```
 
 ---
@@ -180,7 +180,7 @@ Subprocess paths in `full_pipeline.py` default to `/home/scholl-lab/...` — upd
 
 ## 8. Known issues
 
-- Most `__main__` blocks contain hardcoded lab machine paths — update before running. Exception: `cameras/run_recording.py` now has a dedicated `CONFIG` section at the top for this.
+- Most `__main__` blocks contain hardcoded lab machine paths — update before running. Exception: `src/cameras/run_recording.py` has a dedicated `CONFIG` section at the top for this.
 - `cube_solver_demo.py` imports stale APIs that no longer exist.
 - Left/right eye assignment in `run_gaze_pipeline.py` is keyed to ferret ID `"757"` in the path string.
 - No CI test gate exists — tests must be run manually via `uv run pytest`.
