@@ -18,6 +18,10 @@ from pydantic import BaseModel, ConfigDict, model_validator
 from src.kinematics_core.keypoint_trajectories import KeypointTrajectories
 from src.kinematics_core.timeseries_model import Timeseries
 from src.kinematics_core.quaternion_model import Quaternion
+from src.kinematics_core.math_backends import (
+    scipy_rotation_from_wxyz,
+    wxyz_from_scipy_rotation,
+)
 
 
 class QuaternionTrajectory(BaseModel):
@@ -614,6 +618,20 @@ def slerp_quaternions_vectorized(
 
     if not np.all(np.diff(original_timestamps) > 0):
         raise ValueError("original_timestamps must be strictly increasing")
+
+    # Preferred backend: SciPy Rotation + Slerp. If SciPy isn't available in a
+    # runtime environment, we fall back to the existing pure-numpy SLERP below.
+    try:
+        from scipy.spatial.transform import Slerp
+
+        rotations = scipy_rotation_from_wxyz(quaternions_wxyz)
+        slerp = Slerp(original_timestamps, rotations)
+        clamped_target_timestamps = np.clip(
+            target_timestamps, original_timestamps[0], original_timestamps[-1]
+        )
+        return wxyz_from_scipy_rotation(slerp(clamped_target_timestamps))
+    except ImportError:
+        pass
 
     # Find bracketing indices: idx[i] is the index where target_timestamps[i]
     # would be inserted to maintain sorted order
