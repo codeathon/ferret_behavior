@@ -33,6 +33,7 @@ from src.ferret_gaze.eye_kinematics.ferret_eye_kinematics_models import (
     SocketLandmarks,
     TrackedPupil,
 )
+from src.utilities.polars_tidy import build_vector_chunk, extract_timestamps_from_tidy_df
 from src.ferret_gaze.eye_kinematics.ferret_eyeball_reference_geometry import (
     NUM_PUPIL_POINTS,
 )
@@ -42,33 +43,7 @@ from src.kinematics_core.rigid_body_kinematics_model import RigidBodyKinematics
 logger = get_logger(__name__)
 
 
-def _build_vector_chunk(
-    frame_indices: NDArray[np.int64],
-    timestamps: NDArray[np.float64],
-    values: NDArray[np.float64],
-    trajectory_name: str,
-    component_names: list[str],
-    units: str,
-) -> pl.DataFrame:
-    """Build a tidy DataFrame chunk for a vector quantity."""
-    n_frames = len(frame_indices)
-    n_components = len(component_names)
-
-    repeated_frames = np.repeat(frame_indices, n_components)
-    repeated_timestamps = np.repeat(timestamps, n_components)
-    tiled_components = np.tile(component_names, n_frames)
-    flattened_values = values.ravel()
-
-    return pl.DataFrame({
-        "frame": repeated_frames,
-        "timestamp_s": repeated_timestamps,
-        "component": tiled_components,
-        "value": flattened_values,
-    }).with_columns(
-        pl.lit(trajectory_name).alias("trajectory").cast(pl.Categorical),
-        pl.col("component").cast(pl.Categorical),
-        pl.lit(units).alias("units").cast(pl.Categorical),
-    ).select(["frame", "timestamp_s", "trajectory", "component", "value", "units"])
+# build_vector_chunk imported from src.utilities.polars_tidy
 
 
 def ferret_eye_kinematics_to_tidy_dataframe(
@@ -87,7 +62,7 @@ def ferret_eye_kinematics_to_tidy_dataframe(
     chunks: list[pl.DataFrame] = []
 
     # Orientation quaternion (wxyz)
-    chunks.append(_build_vector_chunk(
+    chunks.append(build_vector_chunk(
         frame_indices=frame_indices,
         timestamps=timestamps,
         values=kinematics.quaternions_wxyz,
@@ -97,7 +72,7 @@ def ferret_eye_kinematics_to_tidy_dataframe(
     ))
 
     # Angular velocity global
-    chunks.append(_build_vector_chunk(
+    chunks.append(build_vector_chunk(
         frame_indices=frame_indices,
         timestamps=timestamps,
         values=kinematics.angular_velocity_global,
@@ -107,7 +82,7 @@ def ferret_eye_kinematics_to_tidy_dataframe(
     ))
 
     # Angular velocity local
-    chunks.append(_build_vector_chunk(
+    chunks.append(build_vector_chunk(
         frame_indices=frame_indices,
         timestamps=timestamps,
         values=kinematics.angular_velocity_local,
@@ -117,7 +92,7 @@ def ferret_eye_kinematics_to_tidy_dataframe(
     ))
 
     # Angular acceleration global
-    chunks.append(_build_vector_chunk(
+    chunks.append(build_vector_chunk(
         frame_indices=frame_indices,
         timestamps=timestamps,
         values=kinematics.angular_acceleration_global,
@@ -127,7 +102,7 @@ def ferret_eye_kinematics_to_tidy_dataframe(
     ))
 
     # Angular acceleration local
-    chunks.append(_build_vector_chunk(
+    chunks.append(build_vector_chunk(
         frame_indices=frame_indices,
         timestamps=timestamps,
         values=kinematics.angular_acceleration_local,
@@ -138,7 +113,7 @@ def ferret_eye_kinematics_to_tidy_dataframe(
 
     #TODO - load keypoint data in less stupid way
     # Socket landmarks
-    chunks.append(_build_vector_chunk(
+    chunks.append(build_vector_chunk(
         frame_indices=frame_indices,
         timestamps=timestamps,
         values=kinematics.socket_landmarks.tear_duct_mm,
@@ -147,7 +122,7 @@ def ferret_eye_kinematics_to_tidy_dataframe(
         units="mm",
     ))
 
-    chunks.append(_build_vector_chunk(
+    chunks.append(build_vector_chunk(
         frame_indices=frame_indices,
         timestamps=timestamps,
         values=kinematics.socket_landmarks.outer_eye_mm,
@@ -157,7 +132,7 @@ def ferret_eye_kinematics_to_tidy_dataframe(
     ))
 
     # Tracked pupil center
-    chunks.append(_build_vector_chunk(
+    chunks.append(build_vector_chunk(
         frame_indices=frame_indices,
         timestamps=timestamps,
         values=kinematics.tracked_pupil.pupil_center_mm,
@@ -168,7 +143,7 @@ def ferret_eye_kinematics_to_tidy_dataframe(
 
     # Tracked pupil boundary points p1-p8
     for i in range(NUM_PUPIL_POINTS):
-        chunks.append(_build_vector_chunk(
+        chunks.append(build_vector_chunk(
             frame_indices=frame_indices,
             timestamps=timestamps,
             values=kinematics.tracked_pupil.pupil_points_mm[:, i, :],
@@ -178,7 +153,7 @@ def ferret_eye_kinematics_to_tidy_dataframe(
         ))
 
     # gaze_target
-    chunks.append(_build_vector_chunk(
+    chunks.append(build_vector_chunk(
         frame_indices=frame_indices,
         timestamps=timestamps,
         values=kinematics.rest_gaze_directions,
@@ -188,7 +163,7 @@ def ferret_eye_kinematics_to_tidy_dataframe(
 
     # Pupil ellipse axes
     axes = kinematics.tracked_pupil.pupil_axes_mm  # (N, 2)
-    chunks.append(_build_vector_chunk(
+    chunks.append(build_vector_chunk(
         frame_indices=frame_indices,
         timestamps=timestamps,
         values=axes[:, 0:1],
@@ -196,7 +171,7 @@ def ferret_eye_kinematics_to_tidy_dataframe(
         component_names=["major"],
         units="mm",
     ))
-    chunks.append(_build_vector_chunk(
+    chunks.append(build_vector_chunk(
         frame_indices=frame_indices,
         timestamps=timestamps,
         values=axes[:, 1:2],
@@ -206,7 +181,7 @@ def ferret_eye_kinematics_to_tidy_dataframe(
     ))
 
     # Adduction and elevation angles
-    chunks.append(_build_vector_chunk(
+    chunks.append(build_vector_chunk(
         frame_indices=frame_indices,
         timestamps=timestamps,
         values=kinematics.adduction_angle.values[:, np.newaxis],
@@ -214,7 +189,7 @@ def ferret_eye_kinematics_to_tidy_dataframe(
         component_names=["adduction"],
         units="rad",
     ))
-    chunks.append(_build_vector_chunk(
+    chunks.append(build_vector_chunk(
         frame_indices=frame_indices,
         timestamps=timestamps,
         values=kinematics.elevation_angle.values[:, np.newaxis],
@@ -275,7 +250,7 @@ def load_ferret_eye_kinematics(
     df = pl.read_csv(kinematics_csv_path)
 
     # Extract timestamps
-    timestamps = _extract_timestamps(df)
+    timestamps = extract_timestamps_from_tidy_df(df)
     n_frames = len(timestamps)
 
     # Extract orientation quaternions
@@ -352,14 +327,7 @@ def load_ferret_eye_kinematics_from_directory(
     )
 
 
-def _extract_timestamps(df: pl.DataFrame) -> NDArray[np.float64]:
-    """Extract unique timestamps from tidy dataframe."""
-    frame_timestamps = (
-        df.select(["frame", "timestamp_s"])
-        .unique()
-        .sort("frame")
-    )
-    return frame_timestamps["timestamp_s"].to_numpy().astype(np.float64)
+# extract_timestamps_from_tidy_df imported from src.utilities.polars_tidy
 
 
 def _extract_quaternions(df: pl.DataFrame, n_frames: int) -> NDArray[np.float64]:
