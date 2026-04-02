@@ -73,8 +73,6 @@ def load_trajectory_csv(filepath: Path) -> pd.DataFrame:
 
 def run_visualization(trajectory_csv: Path) -> None:
     """Run all visualization plots from a saved trajectory CSV."""
-    logging.basicConfig(level=logging.INFO, format="%(levelname)s | %(message)s")
-
     logger.info(f"Loading trajectory data from: {trajectory_csv}")
     df = load_trajectory_csv(filepath=trajectory_csv)
 

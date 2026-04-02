@@ -17,7 +17,7 @@ class TimestampSynchronize:
         self.correct_intrinsics = correct_intrinsics
         if not isinstance(folder_path, Path):
             folder_path = Path(folder_path)
-        if not folder_path.exists:
+        if not folder_path.exists():
             raise FileNotFoundError("Input folder path does not exist")
 
         raw_videos_path = folder_path / "raw_videos"

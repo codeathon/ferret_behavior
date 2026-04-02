@@ -15,7 +15,7 @@ class TimestampConverter:
     def __init__(self, folder_path: Path, include_eyes: bool = True):
         if not isinstance(folder_path, Path):
             folder_path = Path(folder_path)
-        if not folder_path.exists:
+        if not folder_path.exists():
             raise FileNotFoundError("Input folder path does not exist")
 
         self.raw_videos_path = folder_path / "raw_videos"
