@@ -7,6 +7,11 @@ import cv2
 import numpy as np
 
 from src.utilities.logging_config import get_logger
+from src.cameras.synchronization.time_units import (
+    seconds_to_nanoseconds,
+    nanoseconds_to_seconds,
+    resolve_synchronized_video_dir,
+)
 
 logger = get_logger(__name__)
 
@@ -19,9 +24,7 @@ class TimestampConverter:
             raise FileNotFoundError("Input folder path does not exist")
 
         self.raw_videos_path = folder_path / "raw_videos"
-        self.synched_videos_path = folder_path / "synchronized_corrected_videos"
-        if not self.synched_videos_path.exists():
-            self.synched_videos_path = folder_path / "synchronized_videos"
+        self.synched_videos_path = resolve_synchronized_video_dir(folder_path)
 
         self.basler_timestamp_mapping_file_name = "timestamp_mapping.json"
         basler_timestamp_mapping_file = (
@@ -53,10 +56,10 @@ class TimestampConverter:
         self.verify_index_to_serial_number()
 
     def seconds_to_nanoseconds(self, seconds: float) -> int:
-        return int(seconds * 1e9)
+        return seconds_to_nanoseconds(seconds)
 
     def nanoseconds_to_seconds(self, nanoseconds: int) -> float:
-        return nanoseconds / 1e9
+        return nanoseconds_to_seconds(nanoseconds)
 
     @property
     def pupil_start_time(self) -> int:

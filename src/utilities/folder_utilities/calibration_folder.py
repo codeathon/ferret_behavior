@@ -22,7 +22,7 @@ class CalibrationFolder(BaseModel):
     processing_step: CalibrationPipelineStep = CalibrationPipelineStep.RAW
 
     @classmethod
-    def from_folder_path(cls, folder: Path | str, expected_processing_step: CalibrationPipelineStep = CalibrationPipelineStep.RAW) -> "RecordingFolder":
+    def from_folder_path(cls, folder: Path | str, expected_processing_step: CalibrationPipelineStep = CalibrationPipelineStep.RAW) -> "CalibrationFolder":
         folder = Path(folder)
         if not folder.exists():
             raise ValueError(f"Folder does not exist: {folder}")

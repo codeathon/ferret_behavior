@@ -69,10 +69,8 @@ class FerretGazeKinematics(BaseModel):
 
 
     def save_to_disk(self, output_directory: str | Path) -> None:
-        from src.kinematics_core.kinematics_serialization import (
-            kinematics_to_tidy_dataframe,
-            _build_vector_chunk,
-        )
+        from src.kinematics_core.kinematics_serialization import kinematics_to_tidy_dataframe
+        from src.utilities.polars_tidy import build_vector_chunk
         import polars as pl
 
         output_directory = Path(output_directory)
@@ -88,7 +86,7 @@ class FerretGazeKinematics(BaseModel):
         # Append horizontal and vertical degree trajectories
         frame_indices = np.arange(self.n_frames, dtype=np.int64)
         gaze_angle_chunks = [
-            _build_vector_chunk(
+            build_vector_chunk(
                 frame_indices=frame_indices,
                 timestamps=self.timestamps,
                 values=self.horizontal_degrees[:, np.newaxis],
@@ -96,7 +94,7 @@ class FerretGazeKinematics(BaseModel):
                 component_names=["horizontal"],
                 units="degrees",
             ),
-            _build_vector_chunk(
+            build_vector_chunk(
                 frame_indices=frame_indices,
                 timestamps=self.timestamps,
                 values=self.vertical_degrees[:, np.newaxis],
