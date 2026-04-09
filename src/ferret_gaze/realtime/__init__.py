@@ -7,6 +7,7 @@ from src.ferret_gaze.realtime.latency_metrics import (
     format_latency_summary,
 )
 from src.ferret_gaze.realtime.per_frame_compute import (
+    OnnxInferenceRuntime,
     FrameInferenceResult,
     RealtimeGazeFuser,
     RealtimeInferenceRuntime,
@@ -17,7 +18,9 @@ from src.ferret_gaze.realtime.per_frame_compute import (
     StubInferenceRuntime,
     StubRollingEyeCalibrator,
     StubTriangulator,
+    TensorRtInferenceRuntime,
     TriangulationResult,
+    create_inference_runtime,
     run_realtime_compute_scaffold,
 )
 from src.ferret_gaze.realtime.publisher import (
@@ -55,10 +58,13 @@ __all__ = [
     "RealtimeTriangulator",
     "RollingEyeCalibrator",
     "RealtimeGazeFuser",
+    "OnnxInferenceRuntime",
+    "TensorRtInferenceRuntime",
     "StubInferenceRuntime",
     "StubTriangulator",
     "StubRollingEyeCalibrator",
     "StubGazeFuser",
+    "create_inference_runtime",
     "run_realtime_compute_scaffold",
     "RealtimePublisher",
     "NoOpRealtimePublisher",

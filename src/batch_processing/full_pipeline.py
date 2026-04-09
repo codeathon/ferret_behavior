@@ -19,6 +19,7 @@ from src.cameras.postprocess import postprocess
 from src.ferret_gaze.realtime import (
     build_synthetic_replay_packets,
     compare_stub_solvers,
+    create_inference_runtime,
     create_realtime_publisher,
     format_latency_summary,
     load_realtime_runtime_config,
@@ -361,7 +362,17 @@ def _run_realtime_pipeline(
 
     # Step 6 scaffold: run per-frame compute stages on replay packets.
     compute_input = replay_packets[: runtime_config.compute_packets]
-    computed_packets = run_realtime_compute_scaffold(compute_input)
+    inference_runtime = create_inference_runtime(
+        backend=runtime_config.inference_backend,
+        model_path=Path(runtime_config.inference_model_path)
+        if runtime_config.inference_model_path
+        else None,
+        provider=runtime_config.onnx_provider,
+    )
+    computed_packets = run_realtime_compute_scaffold(
+        compute_input,
+        inference_runtime=inference_runtime,
+    )
     mean_confidence = (
         sum(packet.confidence or 0.0 for packet in computed_packets) / len(computed_packets)
         if computed_packets
