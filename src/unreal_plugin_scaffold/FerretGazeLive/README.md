@@ -83,8 +83,9 @@ UE 4.27 and other 4.x builds often fail on current Apple Clang; use UE5 for macO
 	- `MaxPacketAgeMs = 80`
 	- `SmoothingAlpha = 0.35`
 	- `RollingWindowSize = 240`
-3. Run smoke publisher from repo root:
+3. Run smoke publisher from repo root (default **circle** gaze; use `--motion sine` for legacy wobble):
 	- `uv run python src/ferret_gaze/realtime/smoke_publish_live.py --seconds 180 --hz 60`
+	- Slower circle: `--circle-period 8` (seconds per full rotation)
 4. Watch Unreal log stats:
 	- `age_ms[p50=..., p95=...]`
 	- `stale_drop=...`
