@@ -72,7 +72,7 @@ if __name__ == "__main__":
         else:
             logger.warning("Unknown flag: %s", flag)
 
-    recording_folder = RecordingFolder.from_folder_path(recording_folder_path)
+    recording_folder = RecordingFolder.from_folder_path(recording_folder)
     pre_recording_validation(recording_folder=recording_folder)
     process_recording(
         recording_folder=recording_folder,

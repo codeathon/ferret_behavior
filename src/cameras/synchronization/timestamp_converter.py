@@ -181,7 +181,7 @@ class TimestampConverter:
         else: 
             eye0_frame_number = eye0_match
 
-        eye1_match = np.searchsorted(self.pupil_eye0_timestamps_utc, basler_utc, side="right")
+        eye1_match = np.searchsorted(self.pupil_eye1_timestamps_utc, basler_utc, side="right")
         if (basler_utc - self.pupil_eye1_timestamps_utc[eye1_match-1]) < abs(basler_utc - self.pupil_eye1_timestamps_utc[eye1_match]):
             eye1_frame_number = eye1_match-1
         else: 
