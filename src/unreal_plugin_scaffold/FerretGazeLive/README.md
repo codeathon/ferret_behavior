@@ -17,6 +17,12 @@ This is a concrete Unreal C++ plugin layout for live gaze rendering.
 	- Broadcasts `OnGazePacket` to Blueprint/C++ listeners.
 	- Broadcasts `OnGazeHealth` every tick for stream telemetry.
 
+- `UGazeRenderApplierComponent` (`UActorComponent`)
+	- Subscribes to `OnGazePacket`.
+	- Applies skull pose to a target actor (or owner).
+	- Draws left/right gaze debug rays.
+	- Drops stale packets (`MaxPacketAgeMs`) and supports optional smoothing.
+
 - `FFerretGazeLiveModule` (`IModuleInterface`)
 	- Standard plugin startup/shutdown hook.
 
@@ -27,8 +33,10 @@ This is a concrete Unreal C++ plugin layout for live gaze rendering.
 - `Source/FerretGazeLive/Public/FerretGazePacket.h`
 - `Source/FerretGazeLive/Public/FerretGazeSubscriberWorker.h`
 - `Source/FerretGazeLive/Public/LiveGazeReceiverComponent.h`
+- `Source/FerretGazeLive/Public/GazeRenderApplierComponent.h`
 - `Source/FerretGazeLive/Private/FerretGazeSubscriberWorker.cpp`
 - `Source/FerretGazeLive/Private/LiveGazeReceiverComponent.cpp`
+- `Source/FerretGazeLive/Private/GazeRenderApplierComponent.cpp`
 - `Source/FerretGazeLive/Private/FerretGazeLiveModule.cpp`
 
 ## Integrate into Unreal project
@@ -37,7 +45,9 @@ This is a concrete Unreal C++ plugin layout for live gaze rendering.
 2. Regenerate project files.
 3. Build project.
 4. Add `LiveGazeReceiverComponent` to an actor.
-5. Bind `OnGazePacket` and drive scene updates.
+5. Add `GazeRenderApplierComponent` to the same actor (or another scene actor).
+6. Set `ReceiverComponent` on the applier, or let it auto-discover on owner.
+7. Optionally set `TargetHeadActor`, `MaxPacketAgeMs`, and smoothing settings.
 
 ## Transport TODOs
 
