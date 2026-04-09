@@ -9,6 +9,14 @@ class FFerretGazeSubscriberWorker;
 class FRunnableThread;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FFerretGazePacketEvent, const FFerretGazePacket&, Packet);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_FiveParams(
+	FFerretGazeHealthEvent,
+	bool, bConnected,
+	int64, LastSequence,
+	int64, LastCaptureUtcNs,
+	int64, TransportDroppedPackets,
+	int64, PolicyDroppedPackets
+);
 
 /**
  * Game-thread bridge for realtime gaze packets.
@@ -45,8 +53,24 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "FerretGaze")
 	FFerretGazePacketEvent OnGazePacket;
 
+	// Emitted each tick so blueprints can show stream health/quality.
+	UPROPERTY(BlueprintAssignable, Category = "FerretGaze")
+	FFerretGazeHealthEvent OnGazeHealth;
+
 	UPROPERTY(BlueprintReadOnly, Category = "FerretGaze")
 	FFerretGazePacket LastPacket;
+
+	UPROPERTY(BlueprintReadOnly, Category = "FerretGaze|Health")
+	bool bTransportConnected = false;
+
+	UPROPERTY(BlueprintReadOnly, Category = "FerretGaze|Health")
+	int64 LastSequence = -1;
+
+	UPROPERTY(BlueprintReadOnly, Category = "FerretGaze|Health")
+	int64 TransportDroppedPackets = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category = "FerretGaze|Health")
+	int64 PolicyDroppedPackets = 0;
 
 private:
 	void StartWorker();

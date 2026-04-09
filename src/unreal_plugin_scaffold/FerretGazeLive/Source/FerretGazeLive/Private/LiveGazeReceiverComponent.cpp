@@ -38,11 +38,36 @@ void ULiveGazeReceiverComponent::TickComponent(
 		++DrainedCount;
 	}
 
+	// latest-frame-wins drops older packets when more than one arrives per tick.
+	if (DrainedCount > 1)
+	{
+		PolicyDroppedPackets += static_cast<int64>(DrainedCount - 1);
+	}
+
 	if (LatestPacket.IsValid())
 	{
 		LastPacket = *LatestPacket;
 		OnGazePacket.Broadcast(*LatestPacket);
 	}
+
+	if (Worker.IsValid())
+	{
+		bTransportConnected = Worker->IsTransportConnected();
+		LastSequence = Worker->GetLastSequence();
+		TransportDroppedPackets = static_cast<int64>(Worker->GetDroppedPacketCount());
+	}
+	else
+	{
+		bTransportConnected = false;
+	}
+
+	OnGazeHealth.Broadcast(
+		bTransportConnected,
+		LastSequence,
+		LastPacket.CaptureUtcNs,
+		TransportDroppedPackets,
+		PolicyDroppedPackets
+	);
 }
 
 void ULiveGazeReceiverComponent::EnqueuePacketForTesting(const FFerretGazePacket& Packet)

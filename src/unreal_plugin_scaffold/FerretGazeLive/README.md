@@ -15,6 +15,7 @@ This is a concrete Unreal C++ plugin layout for live gaze rendering.
 	- Drains queue with a bounded budget (`MaxPacketsPerTick`).
 	- Applies `latest-frame-wins` policy.
 	- Broadcasts `OnGazePacket` to Blueprint/C++ listeners.
+	- Broadcasts `OnGazeHealth` every tick for stream telemetry.
 
 - `FFerretGazeLiveModule` (`IModuleInterface`)
 	- Standard plugin startup/shutdown hook.
@@ -40,6 +41,5 @@ This is a concrete Unreal C++ plugin layout for live gaze rendering.
 
 ## Transport TODOs
 
-- Add actual `ZMQ + MsgPack` decode path inside `ReceivePayload`.
-- Optionally replace JSON parser with MsgPack parser for lower latency.
-- Populate vector/quaternion fields from packet payload.
+- Wire external include/library paths and set `FERRET_GAZE_WITH_ZMQ_MSGPACK=1`.
+- Add structured logs/UE stats for connection churn and drop spikes.

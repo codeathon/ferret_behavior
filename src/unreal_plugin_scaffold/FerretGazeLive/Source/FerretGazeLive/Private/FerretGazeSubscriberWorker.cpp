@@ -48,6 +48,21 @@ FFerretGazeSubscriberWorker::~FFerretGazeSubscriberWorker()
 {
 }
 
+uint64 FFerretGazeSubscriberWorker::GetDroppedPacketCount() const
+{
+	return DroppedPackets.Load();
+}
+
+int64 FFerretGazeSubscriberWorker::GetLastSequence() const
+{
+	return LastSequence.Load();
+}
+
+bool FFerretGazeSubscriberWorker::IsTransportConnected() const
+{
+	return bIsConnected.Load();
+}
+
 uint32 FFerretGazeSubscriberWorker::Run()
 {
 	while (!bStopRequested)
@@ -70,6 +85,7 @@ uint32 FFerretGazeSubscriberWorker::Run()
 		if (Queue != nullptr)
 		{
 			Queue->Enqueue(MakeShared<FFerretGazePacket>(Packet));
+			LastSequence.Store(Packet.Sequence);
 		}
 	}
 
@@ -85,12 +101,14 @@ bool FFerretGazeSubscriberWorker::EnsureTransportReady()
 {
 	if (TransportState == nullptr)
 	{
+		bIsConnected.Store(false);
 		return false;
 	}
 
 #if FERRET_GAZE_WITH_ZMQ_MSGPACK
 	if (TransportState->bConnected)
 	{
+		bIsConnected.Store(true);
 		return true;
 	}
 
@@ -108,12 +126,14 @@ bool FFerretGazeSubscriberWorker::EnsureTransportReady()
 		TransportState->Socket.set(zmq::sockopt::linger, 0);
 		TransportState->Socket.connect(std::string(EndpointUtf8.Get(), EndpointUtf8.Length()));
 		TransportState->bConnected = true;
+		bIsConnected.Store(true);
 		return true;
 	}
 	catch (...)
 	{
 		// Backoff reduces reconnect pressure if endpoint is unavailable.
 		NextReconnectAtSeconds = NowSeconds + 0.5;
+		bIsConnected.Store(false);
 		return false;
 	}
 #else
@@ -121,6 +141,7 @@ bool FFerretGazeSubscriberWorker::EnsureTransportReady()
 	{
 		TransportState->bWarnedUnavailable = true;
 	}
+	bIsConnected.Store(false);
 	return false;
 #endif
 }
@@ -155,9 +176,11 @@ bool FFerretGazeSubscriberWorker::ReceivePayloadBytes(TArray<uint8>& OutPayloadB
 	{
 		TransportState->bConnected = false;
 		NextReconnectAtSeconds = FPlatformTime::Seconds() + 0.5;
+		bIsConnected.Store(false);
 		return false;
 	}
 #else
+	bIsConnected.Store(false);
 	return false;
 #endif
 }
@@ -232,7 +255,7 @@ bool FFerretGazeSubscriberWorker::ParsePayloadMsgpack(const TArray<uint8>& Paylo
 
 void FFerretGazeSubscriberWorker::RecordDrop()
 {
-	++DroppedPackets;
+	DroppedPackets.FetchAdd(1);
 }
 
 bool FFerretGazeSubscriberWorker::ParsePayloadJson(const FString& Payload, FFerretGazePacket& OutPacket) const
