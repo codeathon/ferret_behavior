@@ -1,6 +1,9 @@
 #pragma once
 
+#include <atomic>
+
 #include "CoreMinimal.h"
+#include "Containers/Queue.h"
 #include "HAL/Runnable.h"
 #include "FerretGazePacket.h"
 
@@ -42,13 +45,15 @@ private:
 	FString Endpoint;
 	FString Topic;
 	TQueue<TSharedPtr<FFerretGazePacket>, EQueueMode::Mpsc>* Queue = nullptr;
-	FThreadSafeBool bStopRequested = false;
+	// UE 5.7: FThreadSafeBool in-class / ctor(bool) usage tripped -Werror in packaged game builds.
+	std::atomic<bool> bStopRequested{false};
 	TUniquePtr<FFerretGazeTransportState> TransportState;
-	TAtomic<uint64> DroppedPackets = 0;
+	// std::atomic: UE 5.7 TAtomic<uint64> lacks a portable fetch-add in this toolchain configuration.
+	std::atomic<uint64> DroppedPackets{0};
 	TAtomic<int64> LastSequence = -1;
 	TAtomic<bool> bIsConnected = false;
-	TAtomic<uint64> ReconnectAttempts = 0;
-	TAtomic<uint64> ReceiveErrors = 0;
-	TAtomic<uint64> LastLoggedDroppedPackets = 0;
+	std::atomic<uint64> ReconnectAttempts{0};
+	std::atomic<uint64> ReceiveErrors{0};
+	std::atomic<uint64> LastLoggedDroppedPackets{0};
 	double NextReconnectAtSeconds = 0.0;
 };

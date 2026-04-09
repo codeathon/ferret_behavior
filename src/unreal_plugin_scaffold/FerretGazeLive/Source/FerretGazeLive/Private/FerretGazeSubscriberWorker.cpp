@@ -7,6 +7,17 @@
 #include "Serialization/JsonSerializer.h"
 
 #if FERRET_GAZE_WITH_ZMQ_MSGPACK
+// Unreal defines `check`; Apple headers define `nil` — both collide with msgpack identifiers.
+#ifdef check
+#pragma push_macro("check")
+#undef check
+#define FERRET_GAZE_POP_CHECK_MACRO 1
+#endif
+#ifdef nil
+#pragma push_macro("nil")
+#undef nil
+#define FERRET_GAZE_POP_NIL_MACRO 1
+#endif
 #if defined(__clang__)
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-builtins"
@@ -15,6 +26,14 @@
 #include <zmq.hpp>
 #if defined(__clang__)
 #pragma clang diagnostic pop
+#endif
+#if FERRET_GAZE_POP_CHECK_MACRO
+#pragma pop_macro("check")
+#undef FERRET_GAZE_POP_CHECK_MACRO
+#endif
+#if FERRET_GAZE_POP_NIL_MACRO
+#pragma pop_macro("nil")
+#undef FERRET_GAZE_POP_NIL_MACRO
 #endif
 #endif
 
@@ -58,7 +77,7 @@ FFerretGazeSubscriberWorker::~FFerretGazeSubscriberWorker()
 
 uint64 FFerretGazeSubscriberWorker::GetDroppedPacketCount() const
 {
-	return DroppedPackets.Load();
+	return DroppedPackets.load(std::memory_order_relaxed);
 }
 
 int64 FFerretGazeSubscriberWorker::GetLastSequence() const
@@ -73,7 +92,7 @@ bool FFerretGazeSubscriberWorker::IsTransportConnected() const
 
 uint32 FFerretGazeSubscriberWorker::Run()
 {
-	while (!bStopRequested)
+	while (!bStopRequested.load(std::memory_order_relaxed))
 	{
 		TArray<uint8> PayloadBytes;
 		if (!ReceivePayloadBytes(PayloadBytes))
@@ -102,7 +121,7 @@ uint32 FFerretGazeSubscriberWorker::Run()
 
 void FFerretGazeSubscriberWorker::Stop()
 {
-	bStopRequested = true;
+	bStopRequested.store(true, std::memory_order_relaxed);
 }
 
 bool FFerretGazeSubscriberWorker::EnsureTransportReady()
@@ -128,10 +147,11 @@ bool FFerretGazeSubscriberWorker::EnsureTransportReady()
 
 	try
 	{
-		ReconnectAttempts.FetchAdd(1);
+		ReconnectAttempts.fetch_add(1, std::memory_order_relaxed);
 		const FTCHARToUTF8 EndpointUtf8(*Endpoint);
 		const FTCHARToUTF8 TopicUtf8(*Topic);
-		TransportState->Socket.set(zmq::sockopt::subscribe, TopicUtf8.Get(), static_cast<size_t>(TopicUtf8.Length()));
+		// cppzmq 4.x: subscribe option is null-terminated or string_view (not pointer+length).
+		TransportState->Socket.set(zmq::sockopt::subscribe, TopicUtf8.Get());
 		TransportState->Socket.set(zmq::sockopt::linger, 0);
 		TransportState->Socket.connect(std::string(EndpointUtf8.Get(), EndpointUtf8.Length()));
 		TransportState->bConnected = true;
@@ -188,7 +208,7 @@ bool FFerretGazeSubscriberWorker::ReceivePayloadBytes(TArray<uint8>& OutPayloadB
 		TransportState->bConnected = false;
 		NextReconnectAtSeconds = FPlatformTime::Seconds() + 0.5;
 		bIsConnected.Store(false);
-		ReceiveErrors.FetchAdd(1);
+		ReceiveErrors.fetch_add(1, std::memory_order_relaxed);
 		LogTransportEvent(TEXT("receive_error"));
 		return false;
 	}
@@ -268,11 +288,11 @@ bool FFerretGazeSubscriberWorker::ParsePayloadMsgpack(const TArray<uint8>& Paylo
 
 void FFerretGazeSubscriberWorker::RecordDrop()
 {
-	const uint64 Dropped = DroppedPackets.FetchAdd(1) + 1;
-	const uint64 PreviousLogged = LastLoggedDroppedPackets.Load();
+	const uint64 Dropped = DroppedPackets.fetch_add(1, std::memory_order_relaxed) + 1;
+	const uint64 PreviousLogged = LastLoggedDroppedPackets.load(std::memory_order_relaxed);
 	if (Dropped >= PreviousLogged + 120)
 	{
-		LastLoggedDroppedPackets.Store(Dropped);
+		LastLoggedDroppedPackets.store(Dropped, std::memory_order_relaxed);
 		LogTransportEvent(TEXT("drop_spike"));
 	}
 }
@@ -285,8 +305,8 @@ void FFerretGazeSubscriberWorker::LogTransportEvent(const TCHAR* Message) const
 		TEXT("GazeSubscriber %s | connected=%d reconnect_attempts=%llu receive_errors=%llu dropped=%llu last_seq=%lld"),
 		Message,
 		IsTransportConnected() ? 1 : 0,
-		ReconnectAttempts.Load(),
-		ReceiveErrors.Load(),
+		ReconnectAttempts.load(std::memory_order_relaxed),
+		ReceiveErrors.load(std::memory_order_relaxed),
 		GetDroppedPacketCount(),
 		GetLastSequence()
 	);

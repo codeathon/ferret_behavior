@@ -1,0 +1,6 @@
+# Windows / Linux libs are usually machine-specific; keep placeholders.
+lib/Win64/*
+!lib/Win64/.gitkeep
+lib/Linux/*
+!lib/Linux/.gitkeep
+# Mac: libzmq.a + libsodium.a are vendored under lib/Mac/ for UE builds (see README).

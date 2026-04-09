@@ -21,9 +21,9 @@ public:
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
-	// Receives live packets from ULiveGazeReceiverComponent.
+	// Receives live packets from ULiveGazeReceiverComponent (signature must match dynamic delegate).
 	UFUNCTION()
-	void HandleGazePacket(const FFerretGazePacket& Packet);
+	void HandleGazePacket(FFerretGazePacket Packet);
 
 	// Explicit rebinding helper for runtime wiring.
 	UFUNCTION(BlueprintCallable, Category = "FerretGaze|Render")

@@ -2,13 +2,13 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
+#include "Containers/Queue.h"
 #include "FerretGazePacket.h"
+#include "FerretGazeSubscriberWorker.h"
 #include "LiveGazeReceiverComponent.generated.h"
 
-class FFerretGazeSubscriberWorker;
-class FRunnableThread;
-
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FFerretGazePacketEvent, const FFerretGazePacket&, Packet);
+// By-value USTRUCT: UHT/dynamic delegates do not reliably support const UStruct& parameters.
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FFerretGazePacketEvent, FFerretGazePacket, Packet);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_FiveParams(
 	FFerretGazeHealthEvent,
 	bool, bConnected,

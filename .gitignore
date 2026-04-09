@@ -169,3 +169,7 @@ output/*
 # Synthetic gaze test data (generated on each run)
 python_code/ferret_gaze/calculate_gaze/synthetic_test_data/
 CLAUDE.md
+
+# Repo-wide `lib/` ignores Python eggs; allow Unreal plugin vendored static libs.
+!src/unreal_plugin_scaffold/FerretGazeLive/ThirdParty/lib/
+!src/unreal_plugin_scaffold/FerretGazeLive/ThirdParty/lib/**/*

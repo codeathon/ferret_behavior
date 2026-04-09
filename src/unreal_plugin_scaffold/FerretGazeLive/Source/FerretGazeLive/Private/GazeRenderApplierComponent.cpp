@@ -24,7 +24,7 @@ void UGazeRenderApplierComponent::EndPlay(const EEndPlayReason::Type EndPlayReas
 	Super::EndPlay(EndPlayReason);
 }
 
-void UGazeRenderApplierComponent::HandleGazePacket(const FFerretGazePacket& Packet)
+void UGazeRenderApplierComponent::HandleGazePacket(FFerretGazePacket Packet)
 {
 	if (Packet.Confidence < MinConfidenceToRender)
 	{
@@ -150,7 +150,7 @@ void UGazeRenderApplierComponent::UpdateRollingAgeMetrics(float PacketAgeMs)
 	if (RecentPacketAgesMs.Num() > RollingWindowSize)
 	{
 		const int32 ExcessCount = RecentPacketAgesMs.Num() - RollingWindowSize;
-		RecentPacketAgesMs.RemoveAt(0, ExcessCount, false);
+		RecentPacketAgesMs.RemoveAt(0, ExcessCount, EAllowShrinking::No);
 	}
 	if (RecentPacketAgesMs.Num() == 0)
 	{

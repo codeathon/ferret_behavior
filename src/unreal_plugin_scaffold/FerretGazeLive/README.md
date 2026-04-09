@@ -41,23 +41,38 @@ UE 4.27 and other 4.x builds often fail on current Apple Clang; use UE5 for macO
 - `Source/FerretGazeLive/Private/LiveGazeReceiverComponent.cpp`
 - `Source/FerretGazeLive/Private/GazeRenderApplierComponent.cpp`
 - `Source/FerretGazeLive/Private/FerretGazeLiveModule.cpp`
+- `ThirdParty/README.md` (ZMQ / msgpack headers and libzmq layout)
+
+## ZMQ and msgpack (live transport)
+
+`FerretGazeLive.Build.cs` sets **`FERRET_GAZE_WITH_ZMQ_MSGPACK=1`** on **Win64, Mac, and Linux**. Populate **`Plugins/FerretGazeLive/ThirdParty/`** as described in **`ThirdParty/README.md`** (`include/` for headers, `lib/<Platform>/` for **libzmq**). Other platforms build with the define set to **0** (no link). Windows dynamic **zmq.dll** must be discoverable at runtime (see ThirdParty README).
 
 ## Integrate into Unreal project (UE 5.7)
 
 1. Create or open a **UE 5.7** **C++** project.
 2. Copy this `FerretGazeLive/` folder into `<YourProject>/Plugins/FerretGazeLive` (final path: `Plugins/FerretGazeLive/FerretGazeLive.uplugin`).
-3. Right-click the `.uproject` → **Generate Visual Studio / Xcode project files** (or use the UE context menu).
-4. Build the **Editor** target once (from IDE or `RunUAT.sh BuildEditor` as per Epic docs).
-5. Launch the editor; enable the plugin under **Edit → Plugins** if it is not already enabled.
-6. Add `LiveGazeReceiverComponent` to an actor.
-7. Add `GazeRenderApplierComponent` to the same actor (or another scene actor).
-8. Set `ReceiverComponent` on the applier, or let it auto-discover on owner.
-9. Optionally set `TargetHeadActor`, `MaxPacketAgeMs`, and smoothing settings.
+3. For **Win64 / Mac / Linux Editor** builds, populate **`Plugins/FerretGazeLive/ThirdParty/`** (`include/` + `lib/<Platform>/`) per **`ThirdParty/README.md`** so **libzmq** and headers are present before compiling.
+4. Right-click the `.uproject` → **Generate Visual Studio / Xcode project files** (or use the UE context menu).
+5. Build the **Editor** target once (from IDE or `RunUAT.sh BuildEditor` as per Epic docs).
+6. Launch the editor; enable the plugin under **Edit → Plugins** if it is not already enabled.
+7. Add `LiveGazeReceiverComponent` to an actor.
+8. Add `GazeRenderApplierComponent` to the same actor (or another scene actor).
+9. Set `ReceiverComponent` on the applier, or let it auto-discover on owner.
+10. Optionally set `TargetHeadActor`, `MaxPacketAgeMs`, and smoothing settings.
+
+### If the project fails to compile
+
+- **Layout:** The `.uplugin` file must live at `YourProject/Plugins/FerretGazeLive/FerretGazeLive.uplugin`, with `Source/FerretGazeLive/` beside it. Putting only `Source` under Plugins or pointing an “extra plugins” directory at the wrong folder breaks UBT discovery.
+- **C++ project:** Blueprint-only projects cannot compile this plugin until you add at least one C++ class (File → New C++ Class) so the game module and targets exist.
+- **Regenerate:** After copying the plugin, always regenerate IDE project files from the `.uproject`, then do a clean build of the **Editor** target.
+- **Engine version:** `EngineVersion` in the `.uplugin` must be compatible with your editor. Mismatches can disable the plugin or fail code generation.
+- **UBT enum:** If C# fails with `Unreal5_7` missing from `EngineIncludeOrderVersion`, your install may be older than 5.7; set `IncludeOrderVersion = EngineIncludeOrderVersion.Latest` in `FerretGazeLive.Build.cs` or match the enum your `Engine/Source/Programs/UnrealBuildTool` defines.
+- **Share the first error:** The first compiler or UHT line (not the tail of the log) pinpoints the issue quickly.
+- **ZMQ ThirdParty:** On Win64/Mac/Linux, UBT fails fast if `ThirdParty/lib/<Platform>/` does not contain **libzmq** (see **`ThirdParty/README.md`**). Missing headers show as `msgpack.hpp` / `zmq.hpp` not found under `ThirdParty/include/`.
 
 ## Transport TODOs
 
-- Wire external include/library paths and set `FERRET_GAZE_WITH_ZMQ_MSGPACK=1`.
-- Add structured logs/UE stats for connection churn and drop spikes.
+- Structured logs / UE stats for connection churn and drop spikes (beyond current `LogTemp` counters).
 
 ## Step 8 validation loop
 
