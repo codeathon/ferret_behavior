@@ -44,6 +44,13 @@ def _build_synthetic_packet(seq: int) -> RealtimeGazePacket:
     )
 
 
+def build_synthetic_replay_packets(n_packets: int) -> list[RealtimeGazePacket]:
+    """Create deterministic synthetic packet stream for replay benchmarks."""
+    if n_packets <= 0:
+        raise ValueError("n_packets must be positive")
+    return [_build_synthetic_packet(seq=seq) for seq in range(n_packets)]
+
+
 def run_realtime_transport_scaffold(
     publisher: RealtimePublisher,
     n_packets: int = 120,

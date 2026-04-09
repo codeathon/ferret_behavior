@@ -17,6 +17,8 @@ from typing import Literal
 from src.batch_processing.postprocess_recording import process_recording
 from src.cameras.postprocess import postprocess
 from src.ferret_gaze.realtime import (
+    build_synthetic_replay_packets,
+    compare_stub_solvers,
     create_realtime_publisher,
     format_latency_summary,
     run_realtime_transport_scaffold,
@@ -331,6 +333,24 @@ def _run_realtime_pipeline(
         stale_threshold_ms=80.0,
     )
     logger.info(format_latency_summary(summary))
+
+    # Step 4 benchmark gate scaffold: compare stub solvers on a shared replay
+    # stream so final UKF vs Ceres choice can be deferred safely.
+    replay_packets = build_synthetic_replay_packets(n_packets=120)
+    reference_packets = [packet.model_copy(deep=True) for packet in replay_packets]
+    comparison = compare_stub_solvers(
+        replay_packets=replay_packets,
+        reference_packets=reference_packets,
+    )
+    logger.info(
+        "Stub solver benchmark: ukf(lat_p95_ms=%.2f,pos_err_mm=%.4f) "
+        "vs ceres(lat_p95_ms=%.2f,pos_err_mm=%.4f) -> recommended=%s",
+        comparison.ukf.p95_solver_latency_ms,
+        comparison.ukf.mean_position_error_mm,
+        comparison.ceres.p95_solver_latency_ms,
+        comparison.ceres.mean_position_error_mm,
+        comparison.recommended_solver,
+    )
     logger.info("Realtime transport scaffold complete")
 
 
