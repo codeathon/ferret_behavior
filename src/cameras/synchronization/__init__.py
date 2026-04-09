@@ -13,6 +13,11 @@ from src.cameras.synchronization.realtime_sync import (
     associate_pupil_frames_to_basler,
     nearest_timestamp_index,
 )
+from src.cameras.synchronization.sync_precheck import (
+    max_inter_camera_skew_ns,
+    synthetic_two_camera_ingest_sequence,
+    validate_frame_set_before_unreal_publish,
+)
 
 __all__ = [
     "ClockSample",
@@ -24,4 +29,7 @@ __all__ = [
     "BaslerFrameSetCombiner",
     "nearest_timestamp_index",
     "associate_pupil_frames_to_basler",
+    "max_inter_camera_skew_ns",
+    "synthetic_two_camera_ingest_sequence",
+    "validate_frame_set_before_unreal_publish",
 ]
