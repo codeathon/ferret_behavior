@@ -117,25 +117,36 @@ def run_smoke_publisher(
 	)
 	if motion == "circle":
 		logger.info("Circle gaze: one full revolution every %.2f s (tip of ray traces a circle in plan view).", circle_period_s)
+
+	sent = 0
+	interrupted = False
 	try:
-		for seq in range(packet_count):
-			start_ns = time.time_ns()
-			payload = _build_payload(
-				seq=seq,
-				now_ns=start_ns,
-				motion=motion,
-				hz=hz,
-				circle_period_s=circle_period_s,
-			)
-			packed = msgpack.packb(payload, use_bin_type=True)
-			socket.send_multipart([topic_bytes, packed])
-			elapsed_s = (time.time_ns() - start_ns) / 1e9
-			sleep_s = max(0.0, period_s - elapsed_s)
-			if sleep_s > 0:
-				time.sleep(sleep_s)
+		try:
+			for seq in range(packet_count):
+				start_ns = time.time_ns()
+				payload = _build_payload(
+					seq=seq,
+					now_ns=start_ns,
+					motion=motion,
+					hz=hz,
+					circle_period_s=circle_period_s,
+				)
+				packed = msgpack.packb(payload, use_bin_type=True)
+				socket.send_multipart([topic_bytes, packed])
+				sent += 1
+				elapsed_s = (time.time_ns() - start_ns) / 1e9
+				sleep_s = max(0.0, period_s - elapsed_s)
+				if sleep_s > 0:
+					time.sleep(sleep_s)
+		except KeyboardInterrupt:
+			interrupted = True
+			logger.info("Ctrl+C received; closing socket after %d packet(s).", sent)
 	finally:
 		socket.close(linger=0)
-		logger.info("Smoke publisher finished")
+		if interrupted:
+			logger.info("Smoke publisher exited cleanly (interrupt, %d packets sent).", sent)
+		else:
+			logger.info("Smoke publisher finished normally (%d packets).", sent)
 
 
 def _parse_args() -> argparse.Namespace:
@@ -163,11 +174,16 @@ def _parse_args() -> argparse.Namespace:
 
 if __name__ == "__main__":
 	args = _parse_args()
-	run_smoke_publisher(
-		endpoint=args.endpoint,
-		topic=args.topic,
-		hz=args.hz,
-		seconds=args.seconds,
-		motion=args.motion,
-		circle_period_s=args.circle_period_s,
-	)
+	try:
+		run_smoke_publisher(
+			endpoint=args.endpoint,
+			topic=args.topic,
+			hz=args.hz,
+			seconds=args.seconds,
+			motion=args.motion,
+			circle_period_s=args.circle_period_s,
+		)
+	except KeyboardInterrupt:
+		# Defensive: should be handled inside run_smoke_publisher; avoid traceback on early interrupt.
+		logger.info("Exiting.")
+		sys.exit(0)
