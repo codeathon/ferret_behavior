@@ -44,6 +44,7 @@ dev = [
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-v --tb=short"
+pythonpath = ["."]
 
 [tool.uv]
 # Prioritize PyTorch CUDA index for torch packages
