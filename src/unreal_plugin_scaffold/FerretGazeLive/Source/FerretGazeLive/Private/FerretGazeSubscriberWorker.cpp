@@ -120,6 +120,7 @@ bool FFerretGazeSubscriberWorker::EnsureTransportReady()
 
 	try
 	{
+		ReconnectAttempts.FetchAdd(1);
 		const FTCHARToUTF8 EndpointUtf8(*Endpoint);
 		const FTCHARToUTF8 TopicUtf8(*Topic);
 		TransportState->Socket.set(zmq::sockopt::subscribe, TopicUtf8.Get(), static_cast<size_t>(TopicUtf8.Length()));
@@ -127,6 +128,7 @@ bool FFerretGazeSubscriberWorker::EnsureTransportReady()
 		TransportState->Socket.connect(std::string(EndpointUtf8.Get(), EndpointUtf8.Length()));
 		TransportState->bConnected = true;
 		bIsConnected.Store(true);
+		LogTransportEvent(TEXT("connected"));
 		return true;
 	}
 	catch (...)
@@ -134,6 +136,7 @@ bool FFerretGazeSubscriberWorker::EnsureTransportReady()
 		// Backoff reduces reconnect pressure if endpoint is unavailable.
 		NextReconnectAtSeconds = NowSeconds + 0.5;
 		bIsConnected.Store(false);
+		LogTransportEvent(TEXT("connect_failed"));
 		return false;
 	}
 #else
@@ -177,6 +180,8 @@ bool FFerretGazeSubscriberWorker::ReceivePayloadBytes(TArray<uint8>& OutPayloadB
 		TransportState->bConnected = false;
 		NextReconnectAtSeconds = FPlatformTime::Seconds() + 0.5;
 		bIsConnected.Store(false);
+		ReceiveErrors.FetchAdd(1);
+		LogTransportEvent(TEXT("receive_error"));
 		return false;
 	}
 #else
@@ -255,7 +260,28 @@ bool FFerretGazeSubscriberWorker::ParsePayloadMsgpack(const TArray<uint8>& Paylo
 
 void FFerretGazeSubscriberWorker::RecordDrop()
 {
-	DroppedPackets.FetchAdd(1);
+	const uint64 Dropped = DroppedPackets.FetchAdd(1) + 1;
+	const uint64 PreviousLogged = LastLoggedDroppedPackets.Load();
+	if (Dropped >= PreviousLogged + 120)
+	{
+		LastLoggedDroppedPackets.Store(Dropped);
+		LogTransportEvent(TEXT("drop_spike"));
+	}
+}
+
+void FFerretGazeSubscriberWorker::LogTransportEvent(const TCHAR* Message) const
+{
+	UE_LOG(
+		LogTemp,
+		Log,
+		TEXT("GazeSubscriber %s | connected=%d reconnect_attempts=%llu receive_errors=%llu dropped=%llu last_seq=%lld"),
+		Message,
+		IsTransportConnected() ? 1 : 0,
+		ReconnectAttempts.Load(),
+		ReceiveErrors.Load(),
+		GetDroppedPacketCount(),
+		GetLastSequence()
+	);
 }
 
 bool FFerretGazeSubscriberWorker::ParsePayloadJson(const FString& Payload, FFerretGazePacket& OutPacket) const

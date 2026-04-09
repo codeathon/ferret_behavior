@@ -21,6 +21,7 @@ from src.ferret_gaze.realtime import (
     compare_stub_solvers,
     create_realtime_publisher,
     format_latency_summary,
+    load_realtime_runtime_config,
     run_realtime_compute_scaffold,
     run_realtime_transport_scaffold,
 )
@@ -325,19 +326,24 @@ def _run_realtime_pipeline(
         overwrite_skull_postprocessing,
         overwrite_gaze,
     )
+    runtime_config = load_realtime_runtime_config()
     logger.info("Starting realtime transport scaffold (synthetic packets)")
-    publisher = create_realtime_publisher(backend="noop")
+    publisher = create_realtime_publisher(
+        backend=runtime_config.transport_backend,
+        endpoint=runtime_config.transport_endpoint,
+        topic=runtime_config.transport_topic,
+    )
     summary = run_realtime_transport_scaffold(
         publisher=publisher,
-        n_packets=120,
-        hz=60.0,
-        stale_threshold_ms=80.0,
+        n_packets=runtime_config.transport_packets,
+        hz=runtime_config.transport_hz,
+        stale_threshold_ms=runtime_config.stale_threshold_ms,
     )
     logger.info(format_latency_summary(summary))
 
     # Step 4 benchmark gate scaffold: compare stub solvers on a shared replay
     # stream so final UKF vs Ceres choice can be deferred safely.
-    replay_packets = build_synthetic_replay_packets(n_packets=120)
+    replay_packets = build_synthetic_replay_packets(n_packets=runtime_config.benchmark_packets)
     reference_packets = [packet.model_copy(deep=True) for packet in replay_packets]
     comparison = compare_stub_solvers(
         replay_packets=replay_packets,
@@ -354,7 +360,8 @@ def _run_realtime_pipeline(
     )
 
     # Step 6 scaffold: run per-frame compute stages on replay packets.
-    computed_packets = run_realtime_compute_scaffold(replay_packets)
+    compute_input = replay_packets[: runtime_config.compute_packets]
+    computed_packets = run_realtime_compute_scaffold(compute_input)
     mean_confidence = (
         sum(packet.confidence or 0.0 for packet in computed_packets) / len(computed_packets)
         if computed_packets

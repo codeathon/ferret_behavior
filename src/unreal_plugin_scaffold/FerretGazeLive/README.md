@@ -73,3 +73,16 @@ This is a concrete Unreal C++ plugin layout for live gaze rendering.
 	- If stale drops rise: increase `MaxPacketAgeMs` slightly.
 	- If motion feels laggy: increase `SmoothingAlpha`.
 	- If motion is jittery: decrease `SmoothingAlpha`.
+
+## Step 9 hardening
+
+- Use centralized runtime config:
+	- `src/ferret_gaze/realtime/runtime_config.py`
+- Run acceptance checklist:
+	- `uv run python src/ferret_gaze/realtime/step9_acceptance_check.py`
+	- optional config file: `--config /path/to/realtime_config.json`
+- Receiver now logs transport events with counters:
+	- connection state transitions
+	- reconnect attempts
+	- receive errors
+	- drop spikes (every +120 dropped packets)

@@ -35,6 +35,7 @@ private:
 	bool ParsePayloadMsgpack(const TArray<uint8>& PayloadBytes, FFerretGazePacket& OutPacket) const;
 	bool ParsePayloadJson(const FString& Payload, FFerretGazePacket& OutPacket) const;
 	void RecordDrop();
+	void LogTransportEvent(const TCHAR* Message) const;
 
 private:
 	class FFerretGazeTransportState;
@@ -46,5 +47,8 @@ private:
 	TAtomic<uint64> DroppedPackets = 0;
 	TAtomic<int64> LastSequence = -1;
 	TAtomic<bool> bIsConnected = false;
+	TAtomic<uint64> ReconnectAttempts = 0;
+	TAtomic<uint64> ReceiveErrors = 0;
+	TAtomic<uint64> LastLoggedDroppedPackets = 0;
 	double NextReconnectAtSeconds = 0.0;
 };

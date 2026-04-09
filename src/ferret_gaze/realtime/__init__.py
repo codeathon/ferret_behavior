@@ -30,6 +30,10 @@ from src.ferret_gaze.realtime.scaffold_runner import (
     build_synthetic_replay_packets,
     run_realtime_transport_scaffold,
 )
+from src.ferret_gaze.realtime.runtime_config import (
+    RealtimeRuntimeConfig,
+    load_realtime_runtime_config,
+)
 from src.ferret_gaze.realtime.solver_benchmark import (
     RealtimeSkullSolver,
     SlidingWindowCeresSkullSolverStub,
@@ -63,6 +67,8 @@ __all__ = [
     "format_latency_summary",
     "build_synthetic_replay_packets",
     "run_realtime_transport_scaffold",
+    "RealtimeRuntimeConfig",
+    "load_realtime_runtime_config",
     "RealtimeSkullSolver",
     "SolverBenchmarkStats",
     "SolverBenchmarkComparison",
