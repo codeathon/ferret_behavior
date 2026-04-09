@@ -477,9 +477,10 @@ if __name__=="__main__":
         recording_folder_path = recording_folder_path / "full_recording"
 
 
-    recording_folder_path.mkdir(exist_ok=True, parents=False)
-    (recording_folder_path / "mocap_data").mkdir(exist_ok=True, parents=False)
-    (recording_folder_path / "eye_data").mkdir(exist_ok=True, parents=False)
+    # Allow one-shot setup even when parent directories are missing.
+    recording_folder_path.mkdir(exist_ok=True, parents=True)
+    (recording_folder_path / "mocap_data").mkdir(exist_ok=True, parents=True)
+    (recording_folder_path / "eye_data").mkdir(exist_ok=True, parents=True)
     logger.info("Processing %s", recording_folder_path)
 
     run_pipeline(

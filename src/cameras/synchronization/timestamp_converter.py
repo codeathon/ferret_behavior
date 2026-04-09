@@ -173,7 +173,11 @@ class TimestampConverter:
             logger.debug("  cam %s serial: %s", cam_name, self.index_to_serial_number[cam_name])
     
     def get_closest_pupil_frame_to_basler_frame(self, basler_frame_number: int) -> tuple[int, int, int | None]:
-        basler_utc = np.median(self.synched_basler_timestamps_utc[:, basler_frame_number])
+        basler_utc_samples = [
+            timestamps[basler_frame_number]
+            for timestamps in self.synched_basler_timestamps_utc.values()
+        ]
+        basler_utc = np.median(np.asarray(basler_utc_samples))
         logger.debug("Basler UTC reference: %s", basler_utc)
         eye0_match = np.searchsorted(self.pupil_eye0_timestamps_utc, basler_utc, side="right")
         if (basler_utc - self.pupil_eye0_timestamps_utc[eye0_match-1]) < abs(basler_utc - self.pupil_eye0_timestamps_utc[eye0_match]):
