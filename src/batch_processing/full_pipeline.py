@@ -21,6 +21,7 @@ from src.ferret_gaze.realtime import (
     compare_stub_solvers,
     create_realtime_publisher,
     format_latency_summary,
+    run_realtime_compute_scaffold,
     run_realtime_transport_scaffold,
 )
 from src.utilities.folder_utilities.recording_folder import RecordingFolder
@@ -350,6 +351,19 @@ def _run_realtime_pipeline(
         comparison.ceres.p95_solver_latency_ms,
         comparison.ceres.mean_position_error_mm,
         comparison.recommended_solver,
+    )
+
+    # Step 6 scaffold: run per-frame compute stages on replay packets.
+    computed_packets = run_realtime_compute_scaffold(replay_packets)
+    mean_confidence = (
+        sum(packet.confidence or 0.0 for packet in computed_packets) / len(computed_packets)
+        if computed_packets
+        else 0.0
+    )
+    logger.info(
+        "Per-frame compute scaffold complete: packets=%d, mean_confidence=%.4f",
+        len(computed_packets),
+        mean_confidence,
     )
     logger.info("Realtime transport scaffold complete")
 
