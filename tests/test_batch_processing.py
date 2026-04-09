@@ -177,3 +177,36 @@ class TestPipelineModeScaffold:
             run_pipeline(recording_folder_path=tmp_path, mode="realtime")
             mock_realtime.assert_called_once()
             mock_offline.assert_not_called()
+
+    def test_realtime_pipeline_uses_configured_triangulation_backend(self, tmp_path):
+        # Realtime mode should build the triangulator from runtime config.
+        config_path = tmp_path / "realtime.runtime.json"
+        runtime_config = MagicMock(
+            transport_backend="noop",
+            transport_endpoint="tcp://127.0.0.1:5556",
+            transport_topic="gaze.live",
+            transport_packets=2,
+            transport_hz=30.0,
+            stale_threshold_ms=80.0,
+            benchmark_packets=2,
+            compute_packets=2,
+            inference_backend="stub",
+            inference_model_path=None,
+            onnx_provider="CPUExecutionProvider",
+            triangulation_backend="stub",
+        )
+        with patch("src.batch_processing.full_pipeline.load_realtime_runtime_config", return_value=runtime_config) as mock_load_runtime_config, \
+             patch("src.batch_processing.full_pipeline.create_realtime_publisher"), \
+             patch("src.batch_processing.full_pipeline.run_realtime_transport_scaffold"), \
+             patch("src.batch_processing.full_pipeline.build_synthetic_replay_packets", return_value=[]), \
+             patch("src.batch_processing.full_pipeline.compare_stub_solvers"), \
+             patch("src.batch_processing.full_pipeline.create_inference_runtime"), \
+             patch("src.batch_processing.full_pipeline.create_triangulator") as mock_create_triangulator, \
+             patch("src.batch_processing.full_pipeline.run_realtime_compute_scaffold", return_value=[]):
+            run_pipeline(
+                recording_folder_path=tmp_path,
+                mode="realtime",
+                realtime_config_path=config_path,
+            )
+            mock_load_runtime_config.assert_called_once_with(config_path=config_path)
+            mock_create_triangulator.assert_called_once_with(backend="stub")

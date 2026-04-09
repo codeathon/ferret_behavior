@@ -301,3 +301,16 @@ def create_inference_runtime(
     if backend == "tensorrt":
         return TensorRtInferenceRuntime(engine_path=model_path)
     raise ValueError(f"Unsupported inference backend: {backend}")
+
+
+def create_triangulator(
+    backend: Literal["keypoint_centroid", "stub"] = "keypoint_centroid",
+) -> RealtimeTriangulator:
+    """
+    Build triangulator from backend selection.
+    """
+    if backend == "keypoint_centroid":
+        return KeypointCentroidTriangulator()
+    if backend == "stub":
+        return StubTriangulator()
+    raise ValueError(f"Unsupported triangulation backend: {backend}")

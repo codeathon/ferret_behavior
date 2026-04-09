@@ -98,6 +98,12 @@ uv run python src/batch_processing/full_pipeline.py
 ```
 Pass `overwrite_*` booleans to re-run specific stages (sync, calibration, DLC, triangulation, eye/skull/gaze postprocessing).
 
+### Realtime scaffold pipeline (JSON config)
+Use the checked-in config scaffold at `configs/realtime.runtime.json` and call `run_pipeline(..., mode="realtime", realtime_config_path=...)` from Python:
+```bash
+uv run python -c "from pathlib import Path; from src.batch_processing.full_pipeline import run_pipeline; run_pipeline(recording_folder_path=Path('/tmp/full_recording'), mode='realtime', realtime_config_path=Path('configs/realtime.runtime.json'))"
+```
+
 ### Clip-level gaze pipeline
 Edit the clip path in `__main__` of `run_gaze_pipeline.py`, then:
 ```bash

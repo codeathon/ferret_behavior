@@ -21,6 +21,7 @@ from src.ferret_gaze.realtime.per_frame_compute import (
     StubTriangulator,
     TensorRtInferenceRuntime,
     TriangulationResult,
+    create_triangulator,
     create_inference_runtime,
     run_realtime_compute_scaffold,
 )
@@ -67,6 +68,7 @@ __all__ = [
     "StubRollingEyeCalibrator",
     "StubGazeFuser",
     "create_inference_runtime",
+    "create_triangulator",
     "run_realtime_compute_scaffold",
     "RealtimePublisher",
     "NoOpRealtimePublisher",

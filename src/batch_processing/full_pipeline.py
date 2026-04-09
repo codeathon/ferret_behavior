@@ -20,6 +20,7 @@ from src.ferret_gaze.realtime import (
     build_synthetic_replay_packets,
     compare_stub_solvers,
     create_inference_runtime,
+    create_triangulator,
     create_realtime_publisher,
     format_latency_summary,
     load_realtime_runtime_config,
@@ -297,6 +298,7 @@ def _run_offline_pipeline(
 def _run_realtime_pipeline(
     recording_folder_path: Path,
     calibration_toml_path: Path | None = None,
+    realtime_config_path: Path | None = None,
     include_eye: bool = True,
     overwrite_synchronization: bool = False,
     overwrite_calibration: bool = False,
@@ -327,7 +329,7 @@ def _run_realtime_pipeline(
         overwrite_skull_postprocessing,
         overwrite_gaze,
     )
-    runtime_config = load_realtime_runtime_config()
+    runtime_config = load_realtime_runtime_config(config_path=realtime_config_path)
     logger.info("Starting realtime transport scaffold (synthetic packets)")
     publisher = create_realtime_publisher(
         backend=runtime_config.transport_backend,
@@ -372,6 +374,7 @@ def _run_realtime_pipeline(
     computed_packets = run_realtime_compute_scaffold(
         compute_input,
         inference_runtime=inference_runtime,
+        triangulator=create_triangulator(backend=runtime_config.triangulation_backend),
     )
     mean_confidence = (
         sum(packet.confidence or 0.0 for packet in computed_packets) / len(computed_packets)
@@ -389,6 +392,7 @@ def _run_realtime_pipeline(
 def run_pipeline(
     recording_folder_path: Path,
     calibration_toml_path: Path | None = None,
+    realtime_config_path: Path | None = None,
     include_eye: bool = True,
     overwrite_synchronization: bool = False,
     overwrite_calibration: bool = False,
@@ -404,6 +408,7 @@ def run_pipeline(
 
     `offline` preserves the existing batch behavior.
     `realtime` is scaffolded and reserved for the live Unreal path.
+    Pass `realtime_config_path` to override realtime runtime defaults from JSON.
     """
     if mode == "offline":
         _run_offline_pipeline(
@@ -423,6 +428,7 @@ def run_pipeline(
         _run_realtime_pipeline(
             recording_folder_path=recording_folder_path,
             calibration_toml_path=calibration_toml_path,
+            realtime_config_path=realtime_config_path,
             include_eye=include_eye,
             overwrite_synchronization=overwrite_synchronization,
             overwrite_calibration=overwrite_calibration,

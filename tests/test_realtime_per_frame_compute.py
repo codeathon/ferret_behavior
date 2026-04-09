@@ -9,9 +9,11 @@ from types import SimpleNamespace
 
 from src.ferret_gaze.realtime.per_frame_compute import (
     KeypointCentroidTriangulator,
+    StubTriangulator,
     TensorRtInferenceRuntime,
     OnnxInferenceRuntime,
     FrameInferenceResult,
+    create_triangulator,
     create_inference_runtime,
     run_realtime_compute_scaffold,
 )
@@ -92,3 +94,18 @@ def test_onnx_runtime_parses_confidence_and_xyz_keypoints(monkeypatch: pytest.Mo
     assert result.seq == packet.seq
     assert result.confidence == pytest.approx(0.77)
     assert result.keypoints_xyz == ((1.0, 2.0, 3.0), (4.0, 5.0, 6.0))
+
+
+def test_triangulator_factory_selects_keypoint_centroid() -> None:
+    triangulator = create_triangulator(backend="keypoint_centroid")
+    assert isinstance(triangulator, KeypointCentroidTriangulator)
+
+
+def test_triangulator_factory_selects_stub() -> None:
+    triangulator = create_triangulator(backend="stub")
+    assert isinstance(triangulator, StubTriangulator)
+
+
+def test_triangulator_factory_rejects_unknown_backend() -> None:
+    with pytest.raises(ValueError):
+        create_triangulator(backend="unknown")  # type: ignore[arg-type]

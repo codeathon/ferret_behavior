@@ -31,6 +31,7 @@ class RealtimeRuntimeConfig(BaseModel):
 	inference_backend: str = Field(default="stub")
 	inference_model_path: str | None = Field(default=None)
 	onnx_provider: str = Field(default="CPUExecutionProvider")
+	triangulation_backend: str = Field(default="keypoint_centroid")
 
 	acceptance_max_p95_ms: float = Field(default=80.0, gt=0.0)
 
