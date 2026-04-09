@@ -97,6 +97,7 @@ def save_timestamps(
         "starting_mapping": starting_mapping.model_dump(),
         "ending_mapping": ending_mapping.model_dump(),
     }
-    with open(mapping_path, mode="x") as f:
+    # Use overwrite mode so idempotent pipeline re-runs can refresh mappings.
+    with open(mapping_path, mode="w") as f:
         json.dump(combined, f, indent=4)
     logger.info(f"Saved timestamp mapping → {mapping_path}")
