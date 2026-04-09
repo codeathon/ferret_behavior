@@ -5,6 +5,9 @@ public class FerretGazeLive : ModuleRules
 	public FerretGazeLive(ReadOnlyTargetRules Target) : base(Target)
 	{
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
+		// UE 5.x build settings (required for modern toolchains and IWYU).
+		DefaultBuildSettings = BuildSettingsVersion.V5;
+		IncludeOrderVersion = EngineIncludeOrderVersion.Latest;
 
 		PublicDependencyModuleNames.AddRange(
 			new string[]

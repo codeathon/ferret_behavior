@@ -1,13 +1,21 @@
 #include "FerretGazeSubscriberWorker.h"
 
 #include "Dom/JsonObject.h"
+#include "HAL/PlatformProcess.h"
 #include "HAL/PlatformTime.h"
 #include "Serialization/JsonReader.h"
 #include "Serialization/JsonSerializer.h"
 
 #if FERRET_GAZE_WITH_ZMQ_MSGPACK
+#if defined(__clang__)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-builtins"
+#endif
 #include <msgpack.hpp>
 #include <zmq.hpp>
+#if defined(__clang__)
+#pragma clang diagnostic pop
+#endif
 #endif
 
 #if FERRET_GAZE_WITH_ZMQ_MSGPACK

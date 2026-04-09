@@ -1,6 +1,7 @@
 #include "GazeRenderApplierComponent.h"
 
 #include "DrawDebugHelpers.h"
+#include "Engine/World.h"
 #include "GameFramework/Actor.h"
 #include "LiveGazeReceiverComponent.h"
 

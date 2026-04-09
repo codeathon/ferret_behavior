@@ -2,6 +2,9 @@
 
 This is a concrete Unreal C++ plugin layout for live gaze rendering.
 
+**Target engine:** Unreal Engine **5.7** (see `EngineVersion` in `FerretGazeLive.uplugin`). The editor **Plugins** list shows this build as **Ferret Gaze Live (UE 5.7)** via `FriendlyName`; keep that string in sync when you retarget a new engine minor.  
+UE 4.27 and other 4.x builds often fail on current Apple Clang; use UE5 for macOS development.
+
 ## Class layout
 
 - `FFerretGazeSubscriberWorker` (`FRunnable`)
@@ -39,15 +42,17 @@ This is a concrete Unreal C++ plugin layout for live gaze rendering.
 - `Source/FerretGazeLive/Private/GazeRenderApplierComponent.cpp`
 - `Source/FerretGazeLive/Private/FerretGazeLiveModule.cpp`
 
-## Integrate into Unreal project
+## Integrate into Unreal project (UE 5.7)
 
-1. Copy `FerretGazeLive/` into `<YourProject>/Plugins/`.
-2. Regenerate project files.
-3. Build project.
-4. Add `LiveGazeReceiverComponent` to an actor.
-5. Add `GazeRenderApplierComponent` to the same actor (or another scene actor).
-6. Set `ReceiverComponent` on the applier, or let it auto-discover on owner.
-7. Optionally set `TargetHeadActor`, `MaxPacketAgeMs`, and smoothing settings.
+1. Create or open a **UE 5.7** **C++** project.
+2. Copy this `FerretGazeLive/` folder into `<YourProject>/Plugins/FerretGazeLive` (final path: `Plugins/FerretGazeLive/FerretGazeLive.uplugin`).
+3. Right-click the `.uproject` → **Generate Visual Studio / Xcode project files** (or use the UE context menu).
+4. Build the **Editor** target once (from IDE or `RunUAT.sh BuildEditor` as per Epic docs).
+5. Launch the editor; enable the plugin under **Edit → Plugins** if it is not already enabled.
+6. Add `LiveGazeReceiverComponent` to an actor.
+7. Add `GazeRenderApplierComponent` to the same actor (or another scene actor).
+8. Set `ReceiverComponent` on the applier, or let it auto-discover on owner.
+9. Optionally set `TargetHeadActor`, `MaxPacketAgeMs`, and smoothing settings.
 
 ## Transport TODOs
 
