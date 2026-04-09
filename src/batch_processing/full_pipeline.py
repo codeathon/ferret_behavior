@@ -16,7 +16,11 @@ from typing import Literal
 
 from src.batch_processing.postprocess_recording import process_recording
 from src.cameras.postprocess import postprocess
-from src.ferret_gaze.realtime import create_realtime_publisher, run_realtime_transport_scaffold
+from src.ferret_gaze.realtime import (
+    create_realtime_publisher,
+    format_latency_summary,
+    run_realtime_transport_scaffold,
+)
 from src.utilities.folder_utilities.recording_folder import RecordingFolder
 from src.utilities.logging_config import get_logger
 
@@ -320,11 +324,13 @@ def _run_realtime_pipeline(
     )
     logger.info("Starting realtime transport scaffold (synthetic packets)")
     publisher = create_realtime_publisher(backend="noop")
-    run_realtime_transport_scaffold(
+    summary = run_realtime_transport_scaffold(
         publisher=publisher,
         n_packets=120,
         hz=60.0,
+        stale_threshold_ms=80.0,
     )
+    logger.info(format_latency_summary(summary))
     logger.info("Realtime transport scaffold complete")
 
 

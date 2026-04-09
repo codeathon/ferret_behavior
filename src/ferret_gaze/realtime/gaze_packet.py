@@ -13,6 +13,7 @@ class RealtimeGazePacket(BaseModel):
 
     seq: int = Field(ge=0)
     capture_utc_ns: int = Field(ge=0)
+    process_start_ns: int | None = Field(default=None, ge=0)
     publish_utc_ns: int | None = Field(default=None, ge=0)
 
     # Skull pose in world coordinates (project convention quaternion is wxyz).
