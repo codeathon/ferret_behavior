@@ -9,6 +9,7 @@ from src.ferret_gaze.realtime.latency_metrics import (
 from src.ferret_gaze.realtime.per_frame_compute import (
     OnnxInferenceRuntime,
     FrameInferenceResult,
+    KeypointCentroidTriangulator,
     RealtimeGazeFuser,
     RealtimeInferenceRuntime,
     RealtimeTriangulator,
@@ -52,6 +53,7 @@ __all__ = [
     "LatencySummary",
     "RealtimeLatencyMetrics",
     "FrameInferenceResult",
+    "KeypointCentroidTriangulator",
     "TriangulationResult",
     "RollingCalibrationState",
     "RealtimeInferenceRuntime",

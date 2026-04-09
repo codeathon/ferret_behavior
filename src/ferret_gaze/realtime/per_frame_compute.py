@@ -19,10 +19,11 @@ from src.ferret_gaze.realtime.gaze_packet import RealtimeGazePacket
 
 @dataclass(frozen=True)
 class FrameInferenceResult:
-    """Stub 2D keypoint output for one frame."""
+    """Per-frame inference output with confidence and optional keypoints."""
 
     seq: int
     confidence: float
+    keypoints_xyz: tuple[tuple[float, float, float], ...] = ()
 
 
 @dataclass(frozen=True)
@@ -99,6 +100,7 @@ class OnnxInferenceRuntime(RealtimeInferenceRuntime):
     def __init__(self, model_path: Path, provider: str = "CPUExecutionProvider") -> None:
         self._session = None
         self._input_name = None
+        self._output_names: list[str] = []
         self._provider = provider
         self._model_path = model_path
         self._load_session()
@@ -120,23 +122,55 @@ class OnnxInferenceRuntime(RealtimeInferenceRuntime):
         if not inputs:
             raise ValueError(f"ONNX model has no inputs: {self._model_path}")
         self._input_name = inputs[0].name
+        self._output_names = [output.name for output in self._session.get_outputs()]
 
     def infer(self, packet: RealtimeGazePacket) -> FrameInferenceResult:
-        # Keep model input simple: seq and capture timestamp as float features.
+        # Build a deterministic, explicit input tensor contract for realtime use.
         try:
             import numpy as np
         except ImportError as exc:
             raise ImportError("ONNX backend requires numpy. Install with: uv add numpy") from exc
 
         try:
-            features = np.array([[float(packet.seq), float(packet.capture_utc_ns)]], dtype=np.float32)
-            outputs = self._session.run(None, {self._input_name: features})
-            score = float(np.ravel(outputs[0])[0]) if outputs else 0.5
+            # Features: [seq, capture_s, skull_xyz(3), left_gaze_xyz(3), right_gaze_xyz(3)].
+            features = np.array(
+                [[
+                    float(packet.seq),
+                    float(packet.capture_utc_ns) * 1e-9,
+                    float(packet.skull_position_xyz[0]),
+                    float(packet.skull_position_xyz[1]),
+                    float(packet.skull_position_xyz[2]),
+                    float(packet.left_gaze_direction_xyz[0]),
+                    float(packet.left_gaze_direction_xyz[1]),
+                    float(packet.left_gaze_direction_xyz[2]),
+                    float(packet.right_gaze_direction_xyz[0]),
+                    float(packet.right_gaze_direction_xyz[1]),
+                    float(packet.right_gaze_direction_xyz[2]),
+                ]],
+                dtype=np.float32,
+            )
+            output_names = self._output_names or None
+            outputs = self._session.run(output_names, {self._input_name: features})
+            primary_output = np.ravel(outputs[0]) if outputs else np.array([0.5], dtype=np.float32)
+            score = float(primary_output[0])
             confidence = max(0.0, min(1.0, score))
+
+            # Optional geometry contract: first output may include xyz triplets after confidence.
+            keypoints_xyz: tuple[tuple[float, float, float], ...] = ()
+            if primary_output.size >= 4:
+                remaining = primary_output[1:]
+                valid_len = (remaining.size // 3) * 3
+                reshaped = remaining[:valid_len].reshape(-1, 3)
+                keypoints_xyz = tuple((float(x), float(y), float(z)) for x, y, z in reshaped)
         except Exception:
             # Preserve realtime continuity if model/input mismatch occurs.
             confidence = max(0.0, min(1.0, 0.9 + 0.03 * math.sin(packet.seq * 0.05)))
-        return FrameInferenceResult(seq=packet.seq, confidence=confidence)
+            keypoints_xyz = ()
+        return FrameInferenceResult(
+            seq=packet.seq,
+            confidence=confidence,
+            keypoints_xyz=keypoints_xyz,
+        )
 
 
 class TensorRtInferenceRuntime(RealtimeInferenceRuntime):
@@ -165,6 +199,26 @@ class StubTriangulator(RealtimeTriangulator):
         y = 0.1 * math.cos(inference.seq * 0.03)
         z = 0.02 * math.sin(inference.seq * 0.02)
         return TriangulationResult(seq=inference.seq, skull_position_xyz=(x, y, z))
+
+
+class KeypointCentroidTriangulator(RealtimeTriangulator):
+    """Compute skull position from inference keypoint centroid when available."""
+
+    def triangulate(self, inference: FrameInferenceResult) -> TriangulationResult:
+        if not inference.keypoints_xyz:
+            # Fall back to deterministic behavior to keep realtime loops running.
+            x = 0.1 * math.sin(inference.seq * 0.03)
+            y = 0.1 * math.cos(inference.seq * 0.03)
+            z = 0.02 * math.sin(inference.seq * 0.02)
+            return TriangulationResult(seq=inference.seq, skull_position_xyz=(x, y, z))
+        xs = [point[0] for point in inference.keypoints_xyz]
+        ys = [point[1] for point in inference.keypoints_xyz]
+        zs = [point[2] for point in inference.keypoints_xyz]
+        n = float(len(inference.keypoints_xyz))
+        return TriangulationResult(
+            seq=inference.seq,
+            skull_position_xyz=(sum(xs) / n, sum(ys) / n, sum(zs) / n),
+        )
 
 
 class StubRollingEyeCalibrator(RollingEyeCalibrator):
@@ -216,7 +270,7 @@ def run_realtime_compute_scaffold(
     if not packets:
         return []
     inference_runtime = inference_runtime or StubInferenceRuntime()
-    triangulator = triangulator or StubTriangulator()
+    triangulator = triangulator or KeypointCentroidTriangulator()
     calibrator = calibrator or StubRollingEyeCalibrator()
     fuser = fuser or StubGazeFuser()
 
