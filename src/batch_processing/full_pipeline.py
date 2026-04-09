@@ -7,11 +7,12 @@ requires the following repos/bracnhes installed:
     dlc_to_3d: https://github.com/philipqueen/freemocap_playground@philip/bs
     freemocap: https://github.com/freemocap/freemocap
 """
-from pathlib import Path
 import json
-import subprocess
 import os
+import subprocess
 import sys
+from pathlib import Path
+from typing import Literal
 
 from src.batch_processing.postprocess_recording import process_recording
 from src.cameras.postprocess import postprocess
@@ -224,7 +225,7 @@ def _run_postprocessing(
     logger.info("Session processed: %s", recording_folder_path)
 
 
-def full_pipeline(
+def _run_offline_pipeline(
     recording_folder_path: Path,
     calibration_toml_path: Path | None = None,
     include_eye: bool = True,
@@ -236,6 +237,7 @@ def full_pipeline(
     overwrite_skull_postprocessing: bool = False,
     overwrite_gaze: bool = False,
 ):
+    """Run the existing batch/offline pipeline end-to-end."""
     recording_folder = RecordingFolder.from_folder_path(folder=recording_folder_path)
     flags = _resolve_overwrite_flags(
         recording_folder,
@@ -282,6 +284,126 @@ def full_pipeline(
     _run_postprocessing(recording_folder, recording_folder_path, include_eye, flags)
 
 
+def _run_realtime_pipeline(
+    recording_folder_path: Path,
+    calibration_toml_path: Path | None = None,
+    include_eye: bool = True,
+    overwrite_synchronization: bool = False,
+    overwrite_calibration: bool = False,
+    overwrite_dlc: bool = False,
+    overwrite_triangulation: bool = False,
+    overwrite_eye_postprocessing: bool = False,
+    overwrite_skull_postprocessing: bool = False,
+    overwrite_gaze: bool = False,
+) -> None:
+    """
+    Placeholder for realtime mode orchestration.
+
+    Step 1 scaffold only: validates the mode switch wiring and keeps the
+    current offline implementation unchanged.
+    """
+    # Keep signature parity with offline mode so a single top-level API can
+    # switch behavior without changing caller argument shapes.
+    _ = (
+        recording_folder_path,
+        calibration_toml_path,
+        include_eye,
+        overwrite_synchronization,
+        overwrite_calibration,
+        overwrite_dlc,
+        overwrite_triangulation,
+        overwrite_eye_postprocessing,
+        overwrite_skull_postprocessing,
+        overwrite_gaze,
+    )
+    raise NotImplementedError(
+        "Realtime mode scaffold is in place but not implemented yet. "
+        "Use mode='offline' or full_pipeline(...) for the current behavior."
+    )
+
+
+def run_pipeline(
+    recording_folder_path: Path,
+    calibration_toml_path: Path | None = None,
+    include_eye: bool = True,
+    overwrite_synchronization: bool = False,
+    overwrite_calibration: bool = False,
+    overwrite_dlc: bool = False,
+    overwrite_triangulation: bool = False,
+    overwrite_eye_postprocessing: bool = False,
+    overwrite_skull_postprocessing: bool = False,
+    overwrite_gaze: bool = False,
+    mode: Literal["offline", "realtime"] = "offline",
+) -> None:
+    """
+    Top-level pipeline entrypoint with mode switching.
+
+    `offline` preserves the existing batch behavior.
+    `realtime` is scaffolded and reserved for the live Unreal path.
+    """
+    if mode == "offline":
+        _run_offline_pipeline(
+            recording_folder_path=recording_folder_path,
+            calibration_toml_path=calibration_toml_path,
+            include_eye=include_eye,
+            overwrite_synchronization=overwrite_synchronization,
+            overwrite_calibration=overwrite_calibration,
+            overwrite_dlc=overwrite_dlc,
+            overwrite_triangulation=overwrite_triangulation,
+            overwrite_eye_postprocessing=overwrite_eye_postprocessing,
+            overwrite_skull_postprocessing=overwrite_skull_postprocessing,
+            overwrite_gaze=overwrite_gaze,
+        )
+        return
+    if mode == "realtime":
+        _run_realtime_pipeline(
+            recording_folder_path=recording_folder_path,
+            calibration_toml_path=calibration_toml_path,
+            include_eye=include_eye,
+            overwrite_synchronization=overwrite_synchronization,
+            overwrite_calibration=overwrite_calibration,
+            overwrite_dlc=overwrite_dlc,
+            overwrite_triangulation=overwrite_triangulation,
+            overwrite_eye_postprocessing=overwrite_eye_postprocessing,
+            overwrite_skull_postprocessing=overwrite_skull_postprocessing,
+            overwrite_gaze=overwrite_gaze,
+        )
+        return
+    raise ValueError("mode must be either 'offline' or 'realtime'")
+
+
+def full_pipeline(
+    recording_folder_path: Path,
+    calibration_toml_path: Path | None = None,
+    include_eye: bool = True,
+    overwrite_synchronization: bool = False,
+    overwrite_calibration: bool = False,
+    overwrite_dlc: bool = False,
+    overwrite_triangulation: bool = False,
+    overwrite_eye_postprocessing: bool = False,
+    overwrite_skull_postprocessing: bool = False,
+    overwrite_gaze: bool = False,
+) -> None:
+    """
+    Backward-compatible alias for the existing offline batch pipeline.
+
+    New callers should use `run_pipeline(..., mode='offline'|'realtime')`.
+    """
+    run_pipeline(
+        recording_folder_path=recording_folder_path,
+        calibration_toml_path=calibration_toml_path,
+        include_eye=include_eye,
+        overwrite_synchronization=overwrite_synchronization,
+        overwrite_calibration=overwrite_calibration,
+        overwrite_dlc=overwrite_dlc,
+        overwrite_triangulation=overwrite_triangulation,
+        overwrite_eye_postprocessing=overwrite_eye_postprocessing,
+        overwrite_skull_postprocessing=overwrite_skull_postprocessing,
+        overwrite_gaze=overwrite_gaze,
+        mode="offline",
+    )
+
+
 if __name__=="__main__":
     recording_folder_path = Path(
         "/home/scholl-lab/ferret_recordings/session_2025-10-22_ferret_420_EO13/full_recording"
@@ -296,7 +418,7 @@ if __name__=="__main__":
     (recording_folder_path / "eye_data").mkdir(exist_ok=True, parents=False)
     logger.info("Processing %s", recording_folder_path)
 
-    full_pipeline(
+    run_pipeline(
         recording_folder_path=recording_folder_path,
         overwrite_synchronization=False,
         overwrite_calibration=False,
@@ -304,5 +426,6 @@ if __name__=="__main__":
         overwrite_triangulation=False,
         overwrite_eye_postprocessing=True,
         overwrite_skull_postprocessing=False,
-        overwrite_gaze=True
+        overwrite_gaze=True,
+        mode="offline",
     )

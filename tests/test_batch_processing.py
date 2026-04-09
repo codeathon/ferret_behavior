@@ -30,6 +30,7 @@ from unittest.mock import patch, MagicMock, call
 from src.batch_processing.full_pipeline import (
     _dlc_metadata_is_outdated,
     full_pipeline,
+    run_pipeline,
     HEAD_DLC_ITERATION,
     EYE_DLC_ITERATION,
     TOY_DLC_ITERATION,
@@ -156,3 +157,26 @@ class TestOverwriteFlagCascade:
         mock_rf = self._make_mock_recording_folder(triangulated=False)
         mock_sync, mock_cal, mock_dlc, mock_tri, mock_post = self._run_pipeline_with_flags(tmp_path, mock_rf)
         mock_tri.assert_called_once()
+
+
+class TestPipelineModeScaffold:
+    """Validate top-level offline/realtime mode dispatch behavior."""
+
+    def test_run_pipeline_offline_dispatches_to_offline_impl(self, tmp_path):
+        # Offline mode should execute the existing batch logic path.
+        with patch("src.batch_processing.full_pipeline._run_offline_pipeline") as mock_offline, \
+             patch("src.batch_processing.full_pipeline._run_realtime_pipeline") as mock_realtime:
+            run_pipeline(recording_folder_path=tmp_path, mode="offline")
+            mock_offline.assert_called_once()
+            mock_realtime.assert_not_called()
+
+    def test_run_pipeline_realtime_dispatches_to_realtime_impl(self, tmp_path):
+        # Realtime mode is scaffolded and currently raises NotImplementedError.
+        with patch(
+            "src.batch_processing.full_pipeline._run_realtime_pipeline",
+            side_effect=NotImplementedError("stub"),
+        ) as mock_realtime, patch("src.batch_processing.full_pipeline._run_offline_pipeline") as mock_offline:
+            with pytest.raises(NotImplementedError):
+                run_pipeline(recording_folder_path=tmp_path, mode="realtime")
+            mock_realtime.assert_called_once()
+            mock_offline.assert_not_called()
