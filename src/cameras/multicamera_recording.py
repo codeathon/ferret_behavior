@@ -163,7 +163,7 @@ class MultiCameraRecording:
     # Camera configuration
     # ------------------------------------------------------------------
 
-    def set_hardware_triggering(self, hardware_triggering: bool = False) -> None:
+    def set_hardware_triggering(self, hardware_triggering: bool = True) -> None:
         for camera in self.camera_array:
             if hardware_triggering:
                 camera.TriggerMode.Value = "On"

@@ -14,6 +14,7 @@ disable_throughput_limit).
 """
 
 from src.utilities.logging_config import get_logger
+import queue
 import threading
 import time
 from typing import Callable
@@ -23,6 +24,7 @@ import pypylon.pylon as pylon
 
 from src.cameras.timestamp_utils import latch_timestamp_mapping, save_timestamps
 from src.cameras.video_writers import VideoWriterManager
+from src.cameras.synchronization.realtime_sync import BaslerFrame, BaslerFrameSetCombiner
 
 logger = get_logger(__name__)
 
@@ -52,12 +54,16 @@ class GrabLoopRunner:
         fps: float,
         writer: VideoWriterManager,
         output_path,
+        ring_size: int = 240,
+        combiner_tolerance_ns: int = 2_000_000,
     ) -> None:
         self._camera_array = camera_array
         self._n_cameras = n_cameras
         self._fps = fps
         self._writer = writer
         self._output_path = output_path
+        self._ring_size = ring_size
+        self._combiner_tolerance_ns = combiner_tolerance_ns
 
     # ------------------------------------------------------------------
     # Public grab modes
@@ -167,6 +173,41 @@ class GrabLoopRunner:
         """
         frame_counts = [0] * self._n_cameras
         timestamps = np.zeros((self._n_cameras, max_frames), dtype=np.int64)
+        frameset_count = 0
+
+        combiner = BaslerFrameSetCombiner(
+            camera_ids=list(range(self._n_cameras)),
+            ring_size=self._ring_size,
+            tolerance_ns=self._combiner_tolerance_ns,
+        )
+        frame_queue: queue.Queue[BaslerFrame | None] = queue.Queue(maxsize=max(2_048, self._n_cameras * 128))
+        combiner_stop = threading.Event()
+        combiner_error: list[Exception] = []
+
+        def _combiner_worker() -> None:
+            nonlocal frameset_count
+            while not combiner_stop.is_set():
+                try:
+                    item = frame_queue.get(timeout=0.2)
+                except queue.Empty:
+                    continue
+                if item is None:
+                    break
+                try:
+                    frameset = combiner.ingest(item)
+                    if frameset is not None:
+                        frameset_count += 1
+                except Exception as exc:  # defensive: avoid silent thread death
+                    combiner_error.append(exc)
+                    combiner_stop.set()
+                    break
+
+        combiner_thread = threading.Thread(
+            target=_combiner_worker,
+            name="basler-frameset-combiner",
+            daemon=True,
+        )
+        combiner_thread.start()
 
         self.disable_throughput_limit()
         starting_mapping = latch_timestamp_mapping(self._camera_array)
@@ -195,7 +236,21 @@ class GrabLoopRunner:
                         except IndexError:
                             pass  # Exceeded pre-allocated buffer; trimmed on save.
 
+                        try:
+                            frame_queue.put_nowait(
+                                BaslerFrame(
+                                    camera_id=cam_id,
+                                    frame_index=image_number,
+                                    capture_utc_ns=int(relative_ts),
+                                )
+                            )
+                        except queue.Full:
+                            logger.warning("Combiner queue full; dropping combiner frame for cam %d", cam_id)
+
                         self._writer.write_frame_ffmpeg(frame=result.Array, cam_id=cam_id)
+
+                        if combiner_error:
+                            raise RuntimeError("Frame combiner thread failed") from combiner_error[0]
 
                         if condition(frame_counts):
                             break
@@ -205,6 +260,12 @@ class GrabLoopRunner:
                             f"{result.GetErrorDescription()} (ts={result.GetTimeStamp()})"
                         )
         finally:
+            combiner_stop.set()
+            try:
+                frame_queue.put_nowait(None)
+            except queue.Full:
+                pass
+            combiner_thread.join(timeout=2.0)
             self._writer.release_ffmpeg()
             self._camera_array.StopGrabbing()
 
@@ -216,4 +277,5 @@ class GrabLoopRunner:
             ending_mapping=ending_mapping,
         )
         logger.info(f"Frame counts: {frame_counts}")
+        logger.info("Near-synchronous Basler frame-sets emitted: %d", frameset_count)
         self.pylon_internal_statistics()

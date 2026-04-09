@@ -1,6 +1,10 @@
 """Synchronization utilities for offline and realtime camera paths."""
 
-from src.cameras.synchronization.pupil_clock_sync import ClockSample, PupilClockMapper
+from src.cameras.synchronization.pupil_clock_sync import (
+    ClockSample,
+    PupilClockMapper,
+    collect_live_clock_samples,
+)
 from src.cameras.synchronization.realtime_sync import (
     BaslerFrame,
     BaslerFrameSet,
@@ -13,6 +17,7 @@ from src.cameras.synchronization.realtime_sync import (
 __all__ = [
     "ClockSample",
     "PupilClockMapper",
+    "collect_live_clock_samples",
     "BaslerFrame",
     "BaslerFrameSet",
     "BaslerRingBuffer",
