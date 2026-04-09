@@ -41,6 +41,7 @@ void UGazeRenderApplierComponent::HandleGazePacket(const FFerretGazePacket& Pack
 			++StalePacketDropCount;
 			return;
 		}
+		UpdateRollingAgeMetrics(LastAppliedPacketAgeMs);
 	}
 
 	if (bApplyHeadPose)
@@ -53,6 +54,7 @@ void UGazeRenderApplierComponent::HandleGazePacket(const FFerretGazePacket& Pack
 	}
 
 	++AppliedPacketCount;
+	MaybeLogStats();
 }
 
 void UGazeRenderApplierComponent::RebindReceiver()
@@ -135,4 +137,54 @@ double UGazeRenderApplierComponent::GetUnixTimeNanoseconds() const
 	const auto Now = std::chrono::system_clock::now();
 	const auto SinceEpoch = Now.time_since_epoch();
 	return static_cast<double>(std::chrono::duration_cast<std::chrono::nanoseconds>(SinceEpoch).count());
+}
+
+void UGazeRenderApplierComponent::UpdateRollingAgeMetrics(float PacketAgeMs)
+{
+	if (RollingWindowSize < 10)
+	{
+		RollingWindowSize = 10;
+	}
+	RecentPacketAgesMs.Add(PacketAgeMs);
+	if (RecentPacketAgesMs.Num() > RollingWindowSize)
+	{
+		const int32 ExcessCount = RecentPacketAgesMs.Num() - RollingWindowSize;
+		RecentPacketAgesMs.RemoveAt(0, ExcessCount, false);
+	}
+	if (RecentPacketAgesMs.Num() == 0)
+	{
+		return;
+	}
+
+	TArray<float> SortedAges = RecentPacketAgesMs;
+	SortedAges.Sort();
+	const int32 LastIndex = SortedAges.Num() - 1;
+	const int32 P50Index = FMath::Clamp(FMath::FloorToInt(static_cast<float>(LastIndex) * 0.50f), 0, LastIndex);
+	const int32 P95Index = FMath::Clamp(FMath::FloorToInt(static_cast<float>(LastIndex) * 0.95f), 0, LastIndex);
+	RollingPacketAgeP50Ms = SortedAges[P50Index];
+	RollingPacketAgeP95Ms = SortedAges[P95Index];
+}
+
+void UGazeRenderApplierComponent::MaybeLogStats() const
+{
+	if (LogEveryNAppliedPackets <= 0 || AppliedPacketCount <= 0)
+	{
+		return;
+	}
+	if ((AppliedPacketCount % LogEveryNAppliedPackets) != 0)
+	{
+		return;
+	}
+
+	UE_LOG(
+		LogTemp,
+		Log,
+		TEXT("GazeRender stats | applied=%lld stale_drop=%lld conf_drop=%lld age_ms[p50=%.2f p95=%.2f last=%.2f]"),
+		AppliedPacketCount,
+		StalePacketDropCount,
+		LowConfidenceDropCount,
+		RollingPacketAgeP50Ms,
+		RollingPacketAgeP95Ms,
+		LastAppliedPacketAgeMs
+	);
 }

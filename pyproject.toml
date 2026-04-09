@@ -12,6 +12,7 @@ dependencies = [
     "ffmpeg-python>=0.2.0",
     "jaxlib>=0.7.2",
     "matplotlib>=3.10.1",
+    "msgpack>=1.1.2",
     "numpydantic>=1.7.0",
     "opencv-contrib-python>=4.11.0.86",
     "pandas>=2.3.1",
@@ -22,12 +23,14 @@ dependencies = [
     "pyceres>=2.5",
     "pydantic>=2.10.6",
     "pypylon==4.2.0",
+    "pyzmq>=27.1.0",
     "rerun-sdk>=0.28.2",
     "scipy-stubs~=1.17.0",
     "scipy>=1.16.1",
     "seaborn>=0.13.2",
     "toml>=0.10.2",
-    "torch>=2.5.1", # Changed from 2.8.0 - CUDA wheels don't have 2.8.0 yet
+    # Changed from 2.8.0 - CUDA wheels don't have 2.8.0 yet
+    "torch>=2.11.0",
     "tqdm>=4.67.1",
 ]
 
@@ -49,6 +52,3 @@ index-strategy = "unsafe-best-match"
 name = "pytorch-cu121"
 url = "https://download.pytorch.org/whl/cu121"
 explicit = true
-
-[tool.uv.sources]
-torch = { index = "pytorch-cu121" }

@@ -71,15 +71,32 @@ public:
 	UPROPERTY(BlueprintReadOnly, Category = "FerretGaze|Render|Stats")
 	float LastAppliedPacketAgeMs = 0.0f;
 
+	// Rolling packet age metrics for live tuning.
+	UPROPERTY(BlueprintReadOnly, Category = "FerretGaze|Render|Stats")
+	float RollingPacketAgeP50Ms = 0.0f;
+
+	UPROPERTY(BlueprintReadOnly, Category = "FerretGaze|Render|Stats")
+	float RollingPacketAgeP95Ms = 0.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "FerretGaze|Render|Stats", meta = (ClampMin = "10", ClampMax = "2000"))
+	int32 RollingWindowSize = 240;
+
+	// Set to 0 to disable periodic logging.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "FerretGaze|Render|Stats", meta = (ClampMin = "0"))
+	int32 LogEveryNAppliedPackets = 120;
+
 private:
 	void BindReceiver();
 	void UnbindReceiver();
 	void ApplyHeadPose(const FFerretGazePacket& Packet);
 	void DrawGazeDebugRays(const FFerretGazePacket& Packet) const;
 	double GetUnixTimeNanoseconds() const;
+	void UpdateRollingAgeMetrics(float PacketAgeMs);
+	void MaybeLogStats() const;
 
 private:
 	bool bHasSmoothedPose = false;
 	FVector SmoothedPositionCm = FVector::ZeroVector;
 	FQuat SmoothedOrientation = FQuat::Identity;
+	TArray<float> RecentPacketAgesMs;
 };

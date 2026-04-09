@@ -53,3 +53,23 @@ This is a concrete Unreal C++ plugin layout for live gaze rendering.
 
 - Wire external include/library paths and set `FERRET_GAZE_WITH_ZMQ_MSGPACK=1`.
 - Add structured logs/UE stats for connection churn and drop spikes.
+
+## Step 8 validation loop
+
+1. Add both components to one actor:
+	- `LiveGazeReceiverComponent`
+	- `GazeRenderApplierComponent`
+2. Configure Unreal defaults:
+	- `MaxPacketAgeMs = 80`
+	- `SmoothingAlpha = 0.35`
+	- `RollingWindowSize = 240`
+3. Run smoke publisher from repo root:
+	- `uv run python src/ferret_gaze/realtime/smoke_publish_live.py --seconds 180 --hz 60`
+4. Watch Unreal log stats:
+	- `age_ms[p50=..., p95=...]`
+	- `stale_drop=...`
+	- `conf_drop=...`
+5. Tune:
+	- If stale drops rise: increase `MaxPacketAgeMs` slightly.
+	- If motion feels laggy: increase `SmoothingAlpha`.
+	- If motion is jittery: decrease `SmoothingAlpha`.
