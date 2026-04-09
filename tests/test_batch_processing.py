@@ -171,12 +171,9 @@ class TestPipelineModeScaffold:
             mock_realtime.assert_not_called()
 
     def test_run_pipeline_realtime_dispatches_to_realtime_impl(self, tmp_path):
-        # Realtime mode is scaffolded and currently raises NotImplementedError.
-        with patch(
-            "src.batch_processing.full_pipeline._run_realtime_pipeline",
-            side_effect=NotImplementedError("stub"),
-        ) as mock_realtime, patch("src.batch_processing.full_pipeline._run_offline_pipeline") as mock_offline:
-            with pytest.raises(NotImplementedError):
-                run_pipeline(recording_folder_path=tmp_path, mode="realtime")
+        # Realtime mode should dispatch to the realtime path.
+        with patch("src.batch_processing.full_pipeline._run_realtime_pipeline") as mock_realtime, \
+             patch("src.batch_processing.full_pipeline._run_offline_pipeline") as mock_offline:
+            run_pipeline(recording_folder_path=tmp_path, mode="realtime")
             mock_realtime.assert_called_once()
             mock_offline.assert_not_called()

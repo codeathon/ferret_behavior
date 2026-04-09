@@ -16,6 +16,7 @@ from typing import Literal
 
 from src.batch_processing.postprocess_recording import process_recording
 from src.cameras.postprocess import postprocess
+from src.ferret_gaze.realtime import create_realtime_publisher, run_realtime_transport_scaffold
 from src.utilities.folder_utilities.recording_folder import RecordingFolder
 from src.utilities.logging_config import get_logger
 
@@ -297,10 +298,11 @@ def _run_realtime_pipeline(
     overwrite_gaze: bool = False,
 ) -> None:
     """
-    Placeholder for realtime mode orchestration.
+    Step 2 transport scaffold for realtime mode orchestration.
 
-    Step 1 scaffold only: validates the mode switch wiring and keeps the
-    current offline implementation unchanged.
+    This intentionally does not run capture, inference, or solver logic yet.
+    It validates the realtime transport boundary by emitting synthetic packets
+    through the configured publisher backend.
     """
     # Keep signature parity with offline mode so a single top-level API can
     # switch behavior without changing caller argument shapes.
@@ -316,10 +318,14 @@ def _run_realtime_pipeline(
         overwrite_skull_postprocessing,
         overwrite_gaze,
     )
-    raise NotImplementedError(
-        "Realtime mode scaffold is in place but not implemented yet. "
-        "Use mode='offline' or full_pipeline(...) for the current behavior."
+    logger.info("Starting realtime transport scaffold (synthetic packets)")
+    publisher = create_realtime_publisher(backend="noop")
+    run_realtime_transport_scaffold(
+        publisher=publisher,
+        n_packets=120,
+        hz=60.0,
     )
+    logger.info("Realtime transport scaffold complete")
 
 
 def run_pipeline(
