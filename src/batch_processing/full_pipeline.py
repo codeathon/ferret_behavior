@@ -28,6 +28,7 @@ from src.ferret_gaze.realtime import (
     run_realtime_compute_scaffold,
     run_realtime_transport_scaffold,
 )
+from src.ferret_gaze.realtime.kabsch_skull_solver import create_skull_solver
 from src.ferret_gaze.realtime.live_mocap_grab_session import run_live_mocap_grab_n_frames_publish
 from src.ferret_gaze.realtime.live_mocap_pipeline import (
     build_synthetic_live_mocap_frame_sets,
@@ -365,6 +366,12 @@ def _run_realtime_pipeline(
         backend=runtime_config.triangulation_backend,
         calibration_toml_path=calib_resolved,
     )
+    skull_solver = create_skull_solver(
+        runtime_config.skull_solver_backend,
+        kabsch_reference_npy=Path(runtime_config.skull_solver_kabsch_reference_npy)
+        if runtime_config.skull_solver_kabsch_reference_npy
+        else None,
+    )
 
     # Step 4 benchmark gate scaffold: compare stub solvers on a shared replay stream.
     replay_packets = build_synthetic_replay_packets(n_packets=runtime_config.benchmark_packets)
@@ -410,6 +417,7 @@ def _run_realtime_pipeline(
                     triangulator=triangulator,
                     hz=runtime_config.transport_hz,
                     stale_threshold_ms=runtime_config.stale_threshold_ms,
+                    skull_solver=skull_solver,
                 )
                 session_closed_publisher = True
             elif runtime_config.live_mocap_frame_source == "grab":
@@ -443,6 +451,7 @@ def _run_realtime_pipeline(
                     stale_threshold_ms=runtime_config.stale_threshold_ms,
                     wire_queue_size=runtime_config.live_mocap_grab_wire_queue_size,
                     pace_hz=runtime_config.live_mocap_grab_pace_hz,
+                    skull_solver=skull_solver,
                 )
             else:
                 raise ValueError(

@@ -32,6 +32,7 @@ from src.ferret_gaze.realtime.per_frame_compute import (
 	StubRollingEyeCalibrator,
 )
 from src.ferret_gaze.realtime.publisher import RealtimePublisher
+from src.ferret_gaze.realtime.solver_benchmark import RealtimeSkullSolver
 from src.utilities.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -99,6 +100,7 @@ class LiveMocapGrabPublishWire:
 		calibrator: RollingEyeCalibrator | None = None,
 		fuser: RealtimeGazeFuser | None = None,
 		pace_hz: float | None = None,
+		skull_solver: RealtimeSkullSolver | None = None,
 	) -> None:
 		"""Start a daemon thread that drains the queue and publishes fused packets."""
 		if self._thread is not None and self._thread.is_alive():
@@ -118,6 +120,7 @@ class LiveMocapGrabPublishWire:
 				"calibrator": calib,
 				"fuser": fuse,
 				"pace_hz": pace_hz,
+				"skull_solver": skull_solver,
 			},
 		)
 		self._thread.start()
@@ -133,6 +136,7 @@ class LiveMocapGrabPublishWire:
 		calibrator: RollingEyeCalibrator,
 		fuser: RealtimeGazeFuser,
 		pace_hz: float | None,
+		skull_solver: RealtimeSkullSolver | None,
 	) -> None:
 		metrics = RealtimeLatencyMetrics(stale_threshold_ms=stale_threshold_ms)
 		period_s = (1.0 / pace_hz) if pace_hz is not None and pace_hz > 0 else None
@@ -151,6 +155,7 @@ class LiveMocapGrabPublishWire:
 				triangulator=triangulator,
 				calibrator=calibrator,
 				fuser=fuser,
+				skull_solver=skull_solver,
 			)
 			fused = fused.model_copy(update={"publish_utc_ns": time.time_ns()})
 			publisher.publish(fused)

@@ -76,6 +76,13 @@ class RealtimeRuntimeConfig(BaseModel):
 		description="Optional max publish rate for the consumer thread (None = no extra pacing).",
 	)
 
+	# Optional skull pose refinement on the live mocap path (after triangulation, before fuse).
+	skull_solver_backend: Literal["none", "kabsch"] = Field(default="none")
+	skull_solver_kabsch_reference_npy: str | None = Field(
+		default=None,
+		description="Path to Nx3 float64 ``.npy`` template; defaults to built-in triangle when unset.",
+	)
+
 
 def load_realtime_runtime_config(config_path: Path | None = None) -> RealtimeRuntimeConfig:
 	"""

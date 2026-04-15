@@ -18,5 +18,7 @@
   "inference_output_uv_normalized": false,
   "triangulation_backend": "keypoint_centroid",
   "calibration_toml_path": null,
-  "acceptance_max_p95_ms": 80.0
+  "acceptance_max_p95_ms": 80.0,
+  "skull_solver_backend": "none",
+  "skull_solver_kabsch_reference_npy": null
 }

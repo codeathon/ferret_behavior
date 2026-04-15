@@ -50,6 +50,21 @@ class RealtimeSkullSolver(ABC):
     def solve(self, packet: RealtimeGazePacket) -> RealtimeGazePacket:
         """Return a solved packet for the given frame."""
 
+    def solve_with_context(
+        self,
+        packet: RealtimeGazePacket,
+        *,
+        inference: object | None = None,
+        triangulated: object | None = None,
+    ) -> RealtimeGazePacket:
+        """
+        Optional live path: refine pose using inference / triangulation context.
+
+        Default implementation ignores context and calls :meth:`solve` (replay benchmark).
+        """
+        _ = (inference, triangulated)
+        return self.solve(packet)
+
 
 class UkfRealtimeSkullSolverStub(RealtimeSkullSolver):
     """

@@ -19,6 +19,7 @@ from src.ferret_gaze.realtime.per_frame_compute import (
 	RealtimeTriangulator,
 )
 from src.ferret_gaze.realtime.publisher import RealtimePublisher
+from src.ferret_gaze.realtime.solver_benchmark import RealtimeSkullSolver
 from src.utilities.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -39,6 +40,7 @@ def run_live_mocap_grab_n_frames_publish(
 	wire_queue_size: int = 32,
 	pace_hz: float | None = None,
 	camera_exposure_overrides: dict[str, tuple[int, float]] | None = None,
+	skull_solver: RealtimeSkullSolver | None = None,
 ) -> LatencySummary | None:
 	"""
 	Open cameras, start the live publish consumer, grab ``n_frames`` synchronized sets, then stop.
@@ -72,6 +74,7 @@ def run_live_mocap_grab_n_frames_publish(
 			triangulator=triangulator,
 			stale_threshold_ms=stale_threshold_ms,
 			pace_hz=pace_hz,
+			skull_solver=skull_solver,
 		)
 		try:
 			logger.info(

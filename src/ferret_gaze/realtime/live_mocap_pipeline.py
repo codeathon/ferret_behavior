@@ -32,6 +32,7 @@ from src.ferret_gaze.realtime.per_frame_compute import (
 	StubRollingEyeCalibrator,
 )
 from src.ferret_gaze.realtime.publisher import RealtimePublisher
+from src.ferret_gaze.realtime.solver_benchmark import RealtimeSkullSolver
 from src.utilities.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -114,9 +115,13 @@ def process_live_mocap_tick(
 	triangulator: RealtimeTriangulator,
 	calibrator: RollingEyeCalibrator,
 	fuser: RealtimeGazeFuser,
+	skull_solver: RealtimeSkullSolver | None = None,
 ) -> RealtimeGazePacket:
 	"""
 	Run infer -> triangulate -> calibrate -> fuse for one bundle (no publish).
+
+	Optional ``skull_solver`` runs after triangulation (e.g. Kabsch orientation from
+	keypoints) while :class:`StubGazeFuser` still supplies skull position from triangulation.
 
 	Used by the grab queue consumer and by :func:`run_live_mocap_compute_publish_session`.
 	"""
@@ -124,7 +129,14 @@ def process_live_mocap_tick(
 	inference = inference_runtime.infer(packet, frame_set=frame_set)
 	triangulated = triangulator.triangulate(inference)
 	calibration = calibrator.update(triangulated)
-	return fuser.fuse(packet, triangulated, calibration, inference)
+	packet_for_fuse = packet.model_copy(update={"skull_position_xyz": triangulated.skull_position_xyz})
+	if skull_solver is not None:
+		packet_for_fuse = skull_solver.solve_with_context(
+			packet_for_fuse,
+			inference=inference,
+			triangulated=triangulated,
+		)
+	return fuser.fuse(packet_for_fuse, triangulated, calibration, inference)
 
 
 def run_live_mocap_compute_publish_session(
@@ -137,6 +149,7 @@ def run_live_mocap_compute_publish_session(
 	stale_threshold_ms: float,
 	calibrator: RollingEyeCalibrator | None = None,
 	fuser: RealtimeGazeFuser | None = None,
+	skull_solver: RealtimeSkullSolver | None = None,
 ) -> LatencySummary:
 	"""
 	Run one live session: for each frame set, infer, triangulate, fuse, publish.
@@ -166,6 +179,7 @@ def run_live_mocap_compute_publish_session(
 				triangulator=triangulator,
 				calibrator=calibrator,
 				fuser=fuser,
+				skull_solver=skull_solver,
 			)
 			fused = fused.model_copy(update={"publish_utc_ns": time.time_ns()})
 			publisher.publish(fused)
