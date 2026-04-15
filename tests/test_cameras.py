@@ -249,38 +249,64 @@ class TestConfigureAllCameras:
 
 
 # ===========================================================================
-# logging_config
+# logging_config (shared get_logger under pipeline root "bs")
 # ===========================================================================
 
 class TestGetCameraLogger:
+    """``get_camera_logger`` is ``get_logger`` — handlers live on root ``bs``, not children."""
+
+    @pytest.fixture(autouse=True)
+    def _reset_pipeline_root_logger(self):
+        """First ``get_logger`` call configures the root; reset between tests for isolation."""
+        import src.utilities.logging_config as lc
+
+        root = logging.getLogger(lc._ROOT_LOGGER_NAME)
+        for h in list(root.handlers):
+            root.removeHandler(h)
+            h.close()
+        lc._root_configured = False
+        yield
+        for h in list(root.handlers):
+            root.removeHandler(h)
+            h.close()
+        lc._root_configured = False
+
+    @staticmethod
+    def _root() -> logging.Logger:
+        return logging.getLogger("bs")
+
     def test_returns_logger(self):
         logger = get_camera_logger("test.cameras.a")
         assert isinstance(logger, logging.Logger)
 
     def test_logger_name_matches(self):
         logger = get_camera_logger("test.cameras.b")
-        assert logger.name == "test.cameras.b"
+        assert logger.name == "bs.test.cameras.b"
 
     def test_console_handler_present(self):
-        logger = get_camera_logger("test.cameras.c")
-        stream_handlers = [h for h in logger.handlers if isinstance(h, logging.StreamHandler)
-                           and not isinstance(h, logging.FileHandler)]
+        get_camera_logger("test.cameras.c")
+        stream_handlers = [
+            h
+            for h in self._root().handlers
+            if isinstance(h, logging.StreamHandler) and not isinstance(h, logging.FileHandler)
+        ]
         assert len(stream_handlers) >= 1
 
     def test_file_handler_created_when_dir_exists(self, tmp_path):
         log_dir = tmp_path / "logs"
         log_dir.mkdir()
-        logger = get_camera_logger("test.cameras.file", log_dir=log_dir)
-        file_handlers = [h for h in logger.handlers if isinstance(h, logging.FileHandler)]
+        get_camera_logger("test.cameras.file", log_dir=log_dir)
+        file_handlers = [h for h in self._root().handlers if isinstance(h, logging.FileHandler)]
         assert len(file_handlers) >= 1
+        assert str(file_handlers[0].baseFilename).startswith(str(log_dir.resolve()))
 
     def test_fallback_to_console_when_dir_not_writable(self, tmp_path):
         nonexistent = tmp_path / "no" / "such" / "path"
         # Make parent read-only so mkdir fails
         tmp_path.chmod(0o444)
         try:
-            logger = get_camera_logger("test.cameras.fallback", log_dir=nonexistent)
-            file_handlers = [h for h in logger.handlers if isinstance(h, logging.FileHandler)]
+            get_camera_logger("test.cameras.fallback", log_dir=nonexistent)
+            file_handlers = [h for h in self._root().handlers if isinstance(h, logging.FileHandler)]
             assert len(file_handlers) == 0
         finally:
             tmp_path.chmod(0o755)
@@ -373,14 +399,16 @@ class TestSaveTimestamps:
         data = json.loads((tmp_path / "timestamp_mapping.json").read_text())
         assert "camera_timestamps" in data["starting_mapping"]
 
-    def test_raises_if_json_already_exists(self, tmp_path):
-        """save_timestamps opens with mode='x', so duplicate calls should fail."""
+    def test_second_save_overwrites_json(self, tmp_path):
+        """save_timestamps uses overwrite mode so pipeline re-runs stay idempotent."""
         ts = np.array([[1], [2]], dtype=np.int64)
         start = self._make_mapping([0, 1])
         end = self._make_mapping([0, 1])
         save_timestamps(tmp_path, ts, start, end)
-        with pytest.raises(FileExistsError):
-            save_timestamps(tmp_path, ts, start, end)
+        save_timestamps(tmp_path, ts, start, end)
+        mapping_path = tmp_path / "timestamp_mapping.json"
+        data = json.loads(mapping_path.read_text())
+        assert "starting_mapping" in data
 
 
 # ===========================================================================
