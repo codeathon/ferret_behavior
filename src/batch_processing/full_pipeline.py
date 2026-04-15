@@ -20,13 +20,19 @@ from src.ferret_gaze.realtime import (
     build_synthetic_replay_packets,
     compare_stub_solvers,
     create_inference_runtime,
-    create_triangulator,
     create_realtime_publisher,
+    create_triangulator,
+    discover_session_calibration_toml,
     format_latency_summary,
     load_realtime_runtime_config,
     run_realtime_compute_scaffold,
     run_realtime_transport_scaffold,
 )
+from src.ferret_gaze.realtime.live_mocap_pipeline import (
+    build_synthetic_live_mocap_frame_sets,
+    run_live_mocap_compute_publish_session,
+)
+from src.ferret_gaze.realtime.runtime_config import RealtimeRuntimeConfig
 from src.utilities.folder_utilities.recording_folder import RecordingFolder
 from src.utilities.logging_config import get_logger
 
@@ -295,6 +301,19 @@ def _run_offline_pipeline(
     _run_postprocessing(recording_folder, recording_folder_path, include_eye, flags)
 
 
+def _resolve_realtime_calibration_toml(
+    recording_folder_path: Path,
+    calibration_toml_path: Path | None,
+    runtime_config: RealtimeRuntimeConfig,
+) -> Path | None:
+    """Prefer explicit config path, then caller arg, then session calibration discovery."""
+    if runtime_config.calibration_toml_path:
+        return Path(runtime_config.calibration_toml_path)
+    if calibration_toml_path is not None:
+        return calibration_toml_path
+    return discover_session_calibration_toml(recording_folder_path)
+
+
 def _run_realtime_pipeline(
     recording_folder_path: Path,
     calibration_toml_path: Path | None = None,
@@ -309,17 +328,12 @@ def _run_realtime_pipeline(
     overwrite_gaze: bool = False,
 ) -> None:
     """
-    Step 2 transport scaffold for realtime mode orchestration.
-
-    This intentionally does not run capture, inference, or solver logic yet.
-    It validates the realtime transport boundary by emitting synthetic packets
-    through the configured publisher backend.
+    Realtime mode: ``scaffold`` (synthetic transport + replay compute) or
+    ``live_mocap`` (frame bundles -> infer -> triangulate -> publish).
     """
     # Keep signature parity with offline mode so a single top-level API can
     # switch behavior without changing caller argument shapes.
     _ = (
-        recording_folder_path,
-        calibration_toml_path,
         include_eye,
         overwrite_synchronization,
         overwrite_calibration,
@@ -330,23 +344,28 @@ def _run_realtime_pipeline(
         overwrite_gaze,
     )
     runtime_config = load_realtime_runtime_config(config_path=realtime_config_path)
-    logger.info("Starting realtime transport scaffold (synthetic packets)")
-    publisher = create_realtime_publisher(
-        backend=runtime_config.transport_backend,
-        endpoint=runtime_config.transport_endpoint,
-        topic=runtime_config.transport_topic,
-        payload_format=runtime_config.transport_payload_format,
-    )
-    summary = run_realtime_transport_scaffold(
-        publisher=publisher,
-        n_packets=runtime_config.transport_packets,
-        hz=runtime_config.transport_hz,
-        stale_threshold_ms=runtime_config.stale_threshold_ms,
-    )
-    logger.info(format_latency_summary(summary))
 
-    # Step 4 benchmark gate scaffold: compare stub solvers on a shared replay
-    # stream so final UKF vs Ceres choice can be deferred safely.
+    inference_runtime = create_inference_runtime(
+        backend=runtime_config.inference_backend,
+        model_path=Path(runtime_config.inference_model_path)
+        if runtime_config.inference_model_path
+        else None,
+        provider=runtime_config.onnx_provider,
+        images_input_height=runtime_config.inference_images_height,
+        images_input_width=runtime_config.inference_images_width,
+        output_uv_normalized=runtime_config.inference_output_uv_normalized,
+    )
+    calib_resolved = _resolve_realtime_calibration_toml(
+        recording_folder_path,
+        calibration_toml_path,
+        runtime_config,
+    )
+    triangulator = create_triangulator(
+        backend=runtime_config.triangulation_backend,
+        calibration_toml_path=calib_resolved,
+    )
+
+    # Step 4 benchmark gate scaffold: compare stub solvers on a shared replay stream.
     replay_packets = build_synthetic_replay_packets(n_packets=runtime_config.benchmark_packets)
     reference_packets = [packet.model_copy(deep=True) for packet in replay_packets]
     comparison = compare_stub_solvers(
@@ -363,27 +382,62 @@ def _run_realtime_pipeline(
         comparison.recommended_solver,
     )
 
+    if runtime_config.realtime_mode == "live_mocap":
+        if runtime_config.live_mocap_frame_source != "synthetic":
+            raise ValueError(
+                f"Unsupported live_mocap_frame_source: {runtime_config.live_mocap_frame_source!r}"
+            )
+        logger.info(
+            "Starting live_mocap session (synthetic frame bundles, ticks=%d)",
+            runtime_config.transport_packets,
+        )
+        frame_sets = build_synthetic_live_mocap_frame_sets(
+            runtime_config.transport_packets,
+            n_cams=runtime_config.live_mocap_synthetic_camera_count,
+            height=runtime_config.live_mocap_synthetic_height,
+            width=runtime_config.live_mocap_synthetic_width,
+        )
+        publisher = create_realtime_publisher(
+            backend=runtime_config.transport_backend,
+            endpoint=runtime_config.transport_endpoint,
+            topic=runtime_config.transport_topic,
+            payload_format=runtime_config.transport_payload_format,
+        )
+        run_live_mocap_compute_publish_session(
+            frame_sets=frame_sets,
+            publisher=publisher,
+            inference_runtime=inference_runtime,
+            triangulator=triangulator,
+            hz=runtime_config.transport_hz,
+            stale_threshold_ms=runtime_config.stale_threshold_ms,
+        )
+        logger.info("Realtime live_mocap session complete")
+        return
+
+    if runtime_config.realtime_mode != "scaffold":
+        raise ValueError(f"Unsupported realtime_mode: {runtime_config.realtime_mode!r}")
+
+    logger.info("Starting realtime transport scaffold (synthetic packets)")
+    publisher = create_realtime_publisher(
+        backend=runtime_config.transport_backend,
+        endpoint=runtime_config.transport_endpoint,
+        topic=runtime_config.transport_topic,
+        payload_format=runtime_config.transport_payload_format,
+    )
+    summary = run_realtime_transport_scaffold(
+        publisher=publisher,
+        n_packets=runtime_config.transport_packets,
+        hz=runtime_config.transport_hz,
+        stale_threshold_ms=runtime_config.stale_threshold_ms,
+    )
+    logger.info(format_latency_summary(summary))
+
     # Step 6 scaffold: run per-frame compute stages on replay packets.
     compute_input = replay_packets[: runtime_config.compute_packets]
-    inference_runtime = create_inference_runtime(
-        backend=runtime_config.inference_backend,
-        model_path=Path(runtime_config.inference_model_path)
-        if runtime_config.inference_model_path
-        else None,
-        provider=runtime_config.onnx_provider,
-        images_input_height=runtime_config.inference_images_height,
-        images_input_width=runtime_config.inference_images_width,
-        output_uv_normalized=runtime_config.inference_output_uv_normalized,
-    )
     computed_packets = run_realtime_compute_scaffold(
         compute_input,
         inference_runtime=inference_runtime,
-        triangulator=create_triangulator(
-            backend=runtime_config.triangulation_backend,
-            calibration_toml_path=Path(runtime_config.calibration_toml_path)
-            if runtime_config.calibration_toml_path
-            else None,
-        ),
+        triangulator=triangulator,
     )
     mean_confidence = (
         sum(packet.confidence or 0.0 for packet in computed_packets) / len(computed_packets)

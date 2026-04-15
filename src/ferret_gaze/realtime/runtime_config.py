@@ -43,6 +43,14 @@ class RealtimeRuntimeConfig(BaseModel):
 
 	acceptance_max_p95_ms: float = Field(default=80.0, gt=0.0)
 
+	# Orchestration: ``scaffold`` = synthetic transport + replay compute (legacy).
+	# ``live_mocap`` = frame bundles -> infer -> triangulate -> publish (see live_mocap_pipeline).
+	realtime_mode: Literal["scaffold", "live_mocap"] = Field(default="scaffold")
+	live_mocap_frame_source: Literal["synthetic"] = Field(default="synthetic")
+	live_mocap_synthetic_camera_count: int = Field(default=2, ge=1)
+	live_mocap_synthetic_height: int = Field(default=64, ge=1)
+	live_mocap_synthetic_width: int = Field(default=64, ge=1)
+
 
 def load_realtime_runtime_config(config_path: Path | None = None) -> RealtimeRuntimeConfig:
 	"""

@@ -1,4 +1,5 @@
 {
+  "realtime_mode": "scaffold",
   "transport_backend": "noop",
   "transport_endpoint": "tcp://127.0.0.1:5556",
   "transport_topic": "gaze.live",

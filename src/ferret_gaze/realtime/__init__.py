@@ -42,6 +42,12 @@ from src.ferret_gaze.realtime.publisher import (
     ZmqRealtimePublisher,
     create_realtime_publisher,
 )
+from src.ferret_gaze.realtime.live_mocap_pipeline import (
+    basler_frameset_to_live_mocap_frame_set,
+    build_synthetic_live_mocap_frame_sets,
+    gaze_packet_from_live_mocap_frame_set,
+    run_live_mocap_compute_publish_session,
+)
 from src.ferret_gaze.realtime.scaffold_runner import (
     build_synthetic_replay_packets,
     run_realtime_transport_scaffold,
@@ -97,6 +103,10 @@ __all__ = [
     "format_latency_summary",
     "build_synthetic_replay_packets",
     "run_realtime_transport_scaffold",
+    "gaze_packet_from_live_mocap_frame_set",
+    "basler_frameset_to_live_mocap_frame_set",
+    "build_synthetic_live_mocap_frame_sets",
+    "run_live_mocap_compute_publish_session",
     "RealtimeRuntimeConfig",
     "load_realtime_runtime_config",
     "RealtimeSkullSolver",

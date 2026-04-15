@@ -265,3 +265,77 @@ class TestPipelineModeScaffold:
                 backend="stub",
                 calibration_toml_path=None,
             )
+
+    def test_realtime_pipeline_live_mocap_runs_compute_publish_not_transport(self, tmp_path):
+        """live_mocap mode should drive the live loop, not the synthetic transport scaffold."""
+        config_path = tmp_path / "realtime.runtime.json"
+        config_path.write_text("{}", encoding="utf-8")
+        runtime_config = RealtimeRuntimeConfig(
+            realtime_mode="live_mocap",
+            transport_backend="noop",
+            transport_endpoint="tcp://127.0.0.1:5556",
+            transport_topic="gaze.live",
+            transport_packets=2,
+            transport_hz=1000.0,
+            stale_threshold_ms=80.0,
+            benchmark_packets=2,
+            compute_packets=2,
+            inference_backend="stub",
+            inference_model_path=None,
+            onnx_provider="CPUExecutionProvider",
+            triangulation_backend="stub",
+        )
+        stub_stat = SolverBenchmarkStats(
+            solver_name="ukf_stub",
+            packet_count=0,
+            mean_solver_latency_ms=0.0,
+            p95_solver_latency_ms=0.0,
+            mean_position_error_mm=0.0,
+            mean_quaternion_l1_error=0.0,
+        )
+        stub_comparison = SolverBenchmarkComparison(
+            ukf=stub_stat,
+            ceres=stub_stat,
+            recommended_solver="ukf_stub",
+            recommendation_reason="test",
+        )
+        live_summary = LatencySummary(
+            packet_count=2,
+            dropped_count=0,
+            stale_count=0,
+            end_to_end_p50_ms=0.0,
+            end_to_end_p95_ms=0.0,
+            end_to_end_p99_ms=0.0,
+            process_p50_ms=0.0,
+            process_p95_ms=0.0,
+            process_p99_ms=0.0,
+            stale_threshold_ms=80.0,
+        )
+        with patch(
+            "src.batch_processing.full_pipeline.load_realtime_runtime_config",
+            return_value=runtime_config,
+        ), patch("src.batch_processing.full_pipeline.create_realtime_publisher"), patch(
+            "src.batch_processing.full_pipeline.run_realtime_transport_scaffold",
+        ) as mock_transport, patch(
+            "src.batch_processing.full_pipeline.compare_stub_solvers",
+            return_value=stub_comparison,
+        ), patch(
+            "src.batch_processing.full_pipeline.create_inference_runtime",
+        ), patch(
+            "src.batch_processing.full_pipeline.create_triangulator",
+        ), patch(
+            "src.batch_processing.full_pipeline.run_live_mocap_compute_publish_session",
+            return_value=live_summary,
+        ) as mock_live, patch(
+            "src.batch_processing.full_pipeline.run_realtime_compute_scaffold",
+        ) as mock_replay_compute:
+            run_pipeline(
+                recording_folder_path=tmp_path,
+                mode="realtime",
+                realtime_config_path=config_path,
+            )
+            mock_transport.assert_not_called()
+            mock_replay_compute.assert_not_called()
+            mock_live.assert_called_once()
+            assert mock_live.call_args.kwargs["hz"] == 1000.0
+            assert len(mock_live.call_args.kwargs["frame_sets"]) == 2
