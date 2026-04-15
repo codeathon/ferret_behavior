@@ -17,15 +17,40 @@ unit tests.
 """
 
 import json
+
+import numpy as np
 import pytest
 from pathlib import Path
 
 from src.batch_processing.full_pipeline import _dlc_metadata_is_outdated
 from src.rigid_body_solver.core.main_solver_interface import RigidBodySolverConfig
+from src.rigid_body_solver.core.optimization import OptimizationConfig
 from src.rigid_body_solver.ferret_skull_solver import (
     create_skull_topology,
     create_skull_and_spine_topology,
 )
+
+
+def _minimal_solver_config(tmp_path: Path, *, csv: Path) -> RigidBodySolverConfig:
+    """Build a valid :class:`RigidBodySolverConfig` for construction-only tests."""
+    topology = create_skull_topology()
+    opt = OptimizationConfig(
+        max_iter=5,
+        lambda_data=1.0,
+        lambda_rot_smooth=0.1,
+        lambda_trans_smooth=0.1,
+    )
+    return RigidBodySolverConfig(
+        input_csv=csv,
+        timestamps=np.array([0.0, 0.1], dtype=np.float64),
+        topology=topology,
+        output_dir=tmp_path / "solver_out",
+        optimization=opt,
+        rigid_body_name="ferret_skull",
+        body_frame_origin_keypoints=["nose"],
+        body_frame_x_axis_keypoint="left_eye",
+        body_frame_y_axis_keypoint="right_eye",
+    )
 
 
 # =============================================================================
@@ -74,23 +99,15 @@ class TestRigidBodySolverConfig:
     def test_default_construction(self, tmp_path):
         csv = tmp_path / "markers.csv"
         csv.write_text("frame,x,y,z\n0,0,0,0\n")
-        ref_json = tmp_path / "ref.json"
-        ref_json.write_text("{}")
-        config = RigidBodySolverConfig(
-            measured_trajectories_csv_path=csv,
-            reference_geometry_json_path=ref_json,
-            output_directory=tmp_path / "output",
-        )
-        assert config.measured_trajectories_csv_path == csv
-        assert config.output_directory == tmp_path / "output"
+        config = _minimal_solver_config(tmp_path, csv=csv)
+        assert config.input_csv == csv
+        assert config.output_dir == tmp_path / "solver_out"
 
     def test_output_directory_is_path(self, tmp_path):
-        config = RigidBodySolverConfig(
-            measured_trajectories_csv_path=tmp_path / "m.csv",
-            reference_geometry_json_path=tmp_path / "r.json",
-            output_directory=tmp_path / "out",
-        )
-        assert isinstance(config.output_directory, Path)
+        csv = tmp_path / "m.csv"
+        csv.write_text("frame,x,y,z\n0,0,0,0\n")
+        config = _minimal_solver_config(tmp_path, csv=csv)
+        assert isinstance(config.output_dir, Path)
 
 
 # =============================================================================
@@ -112,10 +129,20 @@ class TestSkullTopologyHelpers:
         assert any("skull" in n or "head" in n or "nose" in n or "eye" in n for n in names)
 
     def test_create_skull_and_spine_topology_returns_topology(self):
-        topology = create_skull_and_spine_topology()
+        skull = create_skull_topology()
+        topology = create_skull_and_spine_topology(
+            skull,
+            spine_keypoint_names=["spine_mid"],
+            spine_display_edges=[("base", "spine_mid")],
+        )
         assert topology is not None
+        assert "spine_mid" in topology.keypoint_names
 
     def test_skull_and_spine_has_more_keypoints_than_skull_only(self):
         skull = create_skull_topology()
-        skull_and_spine = create_skull_and_spine_topology()
+        skull_and_spine = create_skull_and_spine_topology(
+            skull,
+            spine_keypoint_names=["spine_mid"],
+            spine_display_edges=[("base", "spine_mid")],
+        )
         assert len(skull_and_spine.keypoint_names) >= len(skull.keypoint_names)
