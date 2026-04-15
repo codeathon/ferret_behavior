@@ -42,6 +42,10 @@ class RealtimeRuntimeConfig(BaseModel):
 	calibration_toml_path: str | None = Field(default=None)
 
 	acceptance_max_p95_ms: float = Field(default=80.0, gt=0.0)
+	acceptance_max_dropped_count: int = Field(default=0, ge=0)
+	acceptance_max_queue_overflow_count: int = Field(default=0, ge=0)
+	acceptance_max_stage_error_count: int = Field(default=0, ge=0)
+	acceptance_max_publish_error_count: int = Field(default=0, ge=0)
 
 	# Orchestration: ``scaffold`` = synthetic transport + replay compute (legacy).
 	# ``live_mocap`` = frame bundles -> infer -> triangulate -> publish (see live_mocap_pipeline).
@@ -70,6 +74,15 @@ class RealtimeRuntimeConfig(BaseModel):
 	live_mocap_grab_binning_factor: int = Field(default=2, ge=1, le=4)
 	live_mocap_grab_hardware_trigger: bool = Field(default=True)
 	live_mocap_grab_wire_queue_size: int = Field(default=32, ge=1)
+	live_mocap_grab_wire_overflow_policy: Literal["drop_oldest", "drop_newest", "block_with_timeout"] = Field(
+		default="drop_oldest",
+		description="Queue overflow policy for combiner->live-wire enqueue.",
+	)
+	live_mocap_grab_wire_put_timeout_ms: int = Field(
+		default=5,
+		ge=1,
+		description="Timeout used by block_with_timeout wire overflow policy.",
+	)
 	live_mocap_grab_pace_hz: float | None = Field(
 		default=None,
 		gt=0.0,

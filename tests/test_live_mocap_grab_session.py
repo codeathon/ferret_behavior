@@ -110,3 +110,93 @@ def test_grab_n_frames_publish_rejects_zero_frames(tmp_path: Path) -> None:
             triangulator=StubTriangulator(),
             stale_threshold_ms=80.0,
         )
+
+
+def test_grab_n_frames_publish_configures_wire_overflow_policy(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    captured: dict[str, object] = {}
+
+    class _FakeMCR:
+        camera_array = object()
+        devices: list[object] = []
+        output_path = tmp_path
+
+        def __init__(self, output_path: Path, nir_only: bool, fps: float) -> None:
+            _ = (nir_only, fps)
+            self.output_path = output_path
+
+        def open_camera_array(self) -> None:
+            pass
+
+        def set_max_num_buffer(self, n: int) -> None:
+            _ = n
+
+        def set_fps(self, f: float) -> None:
+            _ = f
+
+        def set_image_resolution(self, binning_factor: int) -> None:
+            _ = binning_factor
+
+        def set_hardware_triggering(self, hardware_triggering: bool) -> None:
+            _ = hardware_triggering
+
+        def camera_information(self) -> None:
+            pass
+
+        def create_video_writers_ffmpeg(self) -> None:
+            pass
+
+        def close_camera_array(self) -> None:
+            pass
+
+        def grab_n_frames(self, n: int, frameset_sink: object | None = None) -> None:
+            _ = n, frameset_sink
+
+    class _FakeWire:
+        def __init__(self, max_queue_size: int) -> None:
+            captured["max_queue_size"] = max_queue_size
+
+        def configure_overflow_policy(self, *, overflow_policy: str, put_timeout_ms: int) -> None:
+            captured["overflow_policy"] = overflow_policy
+            captured["put_timeout_ms"] = put_timeout_ms
+
+        def start_background_publisher(self, **kwargs) -> None:
+            _ = kwargs
+
+        def stop_background_publisher(self, *, join_timeout_s: float = 10.0):
+            _ = join_timeout_s
+            return None
+
+    monkeypatch.setattr(
+        "src.ferret_gaze.realtime.live_mocap_grab_session.MultiCameraRecording",
+        _FakeMCR,
+    )
+    monkeypatch.setattr(
+        "src.ferret_gaze.realtime.live_mocap_grab_session.LiveMocapGrabPublishWire",
+        _FakeWire,
+    )
+    monkeypatch.setattr(
+        "src.ferret_gaze.realtime.live_mocap_grab_session.configure_all_cameras",
+        lambda **kwargs: None,
+    )
+
+    run_live_mocap_grab_n_frames_publish(
+        output_path=tmp_path,
+        nir_only=False,
+        fps=60.0,
+        binning_factor=2,
+        hardware_triggering=False,
+        n_frames=2,
+        publisher=NoOpRealtimePublisher(),
+        inference_runtime=StubInferenceRuntime(),
+        triangulator=StubTriangulator(),
+        stale_threshold_ms=80.0,
+        wire_queue_size=13,
+        wire_overflow_policy="block_with_timeout",
+        wire_put_timeout_ms=21,
+    )
+    assert captured["max_queue_size"] == 13
+    assert captured["overflow_policy"] == "block_with_timeout"
+    assert captured["put_timeout_ms"] == 21

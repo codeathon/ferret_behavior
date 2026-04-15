@@ -9,6 +9,7 @@ so combiner frame-sets are queued and processed on a background publisher thread
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Literal
 
 from src.cameras.camera_config import configure_all_cameras
 from src.cameras.multicamera_recording import MultiCameraRecording
@@ -40,6 +41,8 @@ def run_live_mocap_grab_n_frames_publish(
 	triangulator: RealtimeTriangulator,
 	stale_threshold_ms: float,
 	wire_queue_size: int = 32,
+	wire_overflow_policy: Literal["drop_oldest", "drop_newest", "block_with_timeout"] = "drop_oldest",
+	wire_put_timeout_ms: int = 5,
 	pace_hz: float | None = None,
 	camera_exposure_overrides: dict[str, tuple[int, float]] | None = None,
 	skull_solver: RealtimeSkullSolver | None = None,
@@ -73,6 +76,10 @@ def run_live_mocap_grab_n_frames_publish(
 		mcr.create_video_writers_ffmpeg()
 
 		wire = LiveMocapGrabPublishWire(max_queue_size=wire_queue_size)
+		wire.configure_overflow_policy(
+			overflow_policy=wire_overflow_policy,
+			put_timeout_ms=wire_put_timeout_ms,
+		)
 		wire.start_background_publisher(
 			publisher=publisher,
 			inference_runtime=inference_runtime,

@@ -186,6 +186,11 @@ def test_latency_metrics_summary_and_format() -> None:
     assert summary.packet_count == 3
     assert summary.dropped_count == 1
     assert summary.stale_count == 3
+    assert summary.queue_overflow_count == 0
+    assert summary.stage_error_count == 0
+    assert summary.publish_error_count == 0
     assert summary.end_to_end_p95_ms > 0.0
     assert summary.process_p95_ms > 0.0
-    assert "p50/p95/p99" in format_latency_summary(summary)
+    formatted = format_latency_summary(summary)
+    assert "p50/p95/p99" in formatted
+    assert "queue_overflow=0" in formatted

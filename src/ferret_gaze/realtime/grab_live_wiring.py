@@ -11,6 +11,7 @@ from __future__ import annotations
 import queue
 import threading
 import time
+from typing import Literal
 
 from src.cameras.synchronization.realtime_sync import BaslerFrameSet
 from src.ferret_gaze.realtime.latency_metrics import (
@@ -67,9 +68,33 @@ class LiveMocapGrabPublishWire:
 		self._seq = 0
 		self._thread: threading.Thread | None = None
 		self._last_summary: LatencySummary | None = None
+		self._overflow_policy: Literal["drop_oldest", "drop_newest", "block_with_timeout"] = "drop_oldest"
+		self._put_timeout_s = 0.005
+		self._queue_overflow_count = 0
+		self._counter_lock = threading.Lock()
+
+	def configure_overflow_policy(
+		self,
+		*,
+		overflow_policy: Literal["drop_oldest", "drop_newest", "block_with_timeout"],
+		put_timeout_ms: int = 5,
+	) -> None:
+		"""Configure queue overflow behavior for combiner->wire enqueue."""
+		if put_timeout_ms < 1:
+			raise ValueError("put_timeout_ms must be at least 1")
+		self._overflow_policy = overflow_policy
+		self._put_timeout_s = float(put_timeout_ms) / 1000.0
+
+	def _increment_queue_overflow(self) -> None:
+		with self._counter_lock:
+			self._queue_overflow_count += 1
+
+	def _queue_overflow_count_snapshot(self) -> int:
+		with self._counter_lock:
+			return self._queue_overflow_count
 
 	def __call__(self, basler: BaslerFrameSet) -> None:
-		"""Enqueue one live bundle; drops oldest item if the queue is full."""
+		"""Enqueue one live bundle using the configured overflow policy."""
 		live = basler_frameset_to_live_mocap_frame_set(basler, self._seq)
 		self._seq += 1
 		if live is None:
@@ -77,6 +102,17 @@ class LiveMocapGrabPublishWire:
 		try:
 			self._q.put_nowait(live)
 		except queue.Full:
+			self._increment_queue_overflow()
+			if self._overflow_policy == "drop_newest":
+				logger.warning("Live mocap grab wire queue full; dropping newest frame set")
+				return
+			if self._overflow_policy == "block_with_timeout":
+				try:
+					self._q.put(live, block=True, timeout=self._put_timeout_s)
+				except queue.Full:
+					logger.warning("Live mocap grab wire queue full; timed out waiting to enqueue frame set")
+				return
+			# Default: drop oldest and retry once to preserve latest live frame.
 			try:
 				self._q.get_nowait()
 			except queue.Empty:
@@ -84,7 +120,7 @@ class LiveMocapGrabPublishWire:
 			try:
 				self._q.put_nowait(live)
 			except queue.Full:
-				logger.warning("Live mocap grab wire queue full; dropping frame set")
+				logger.warning("Live mocap grab wire queue full; dropping frame set after eviction")
 
 	def pending_count(self) -> int:
 		"""Approximate queued bundles (for tests / diagnostics)."""
@@ -139,6 +175,7 @@ class LiveMocapGrabPublishWire:
 		skull_solver: RealtimeSkullSolver | None,
 	) -> None:
 		metrics = RealtimeLatencyMetrics(stale_threshold_ms=stale_threshold_ms)
+		metrics.record_queue_overflow(self._queue_overflow_count_snapshot())
 		period_s = (1.0 / pace_hz) if pace_hz is not None and pace_hz > 0 else None
 		while True:
 			try:
@@ -149,16 +186,26 @@ class LiveMocapGrabPublishWire:
 				break
 			assert isinstance(item, LiveMocapFrameSet)
 			t_loop = time.perf_counter()
-			fused = process_live_mocap_tick(
-				item,
-				inference_runtime=inference_runtime,
-				triangulator=triangulator,
-				calibrator=calibrator,
-				fuser=fuser,
-				skull_solver=skull_solver,
-			)
+			try:
+				fused = process_live_mocap_tick(
+					item,
+					inference_runtime=inference_runtime,
+					triangulator=triangulator,
+					calibrator=calibrator,
+					fuser=fuser,
+					skull_solver=skull_solver,
+				)
+			except Exception as exc:
+				metrics.record_stage_error()
+				logger.warning("Live mocap stage failure; skipping frame set: %s", exc)
+				continue
 			fused = fused.model_copy(update={"publish_utc_ns": time.time_ns()})
-			publisher.publish(fused)
+			try:
+				publisher.publish(fused)
+			except Exception as exc:
+				metrics.record_publish_error()
+				logger.warning("Live mocap publish failure; dropping packet seq=%d: %s", fused.seq, exc)
+				continue
 			metrics.observe(packet=fused, now_utc_ns=time.time_ns())
 			if period_s is not None:
 				elapsed = time.perf_counter() - t_loop

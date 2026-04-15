@@ -466,6 +466,8 @@ def _run_realtime_pipeline(
                     triangulator=triangulator,
                     stale_threshold_ms=runtime_config.stale_threshold_ms,
                     wire_queue_size=runtime_config.live_mocap_grab_wire_queue_size,
+                    wire_overflow_policy=runtime_config.live_mocap_grab_wire_overflow_policy,
+                    wire_put_timeout_ms=runtime_config.live_mocap_grab_wire_put_timeout_ms,
                     pace_hz=runtime_config.live_mocap_grab_pace_hz,
                     calibrator=eye_calibrator,
                     fuser=gaze_fuser,

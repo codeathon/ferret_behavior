@@ -121,3 +121,135 @@ def test_grab_wire_bounded_queue_drops_before_consumer_starts() -> None:
 	summary = wire.stop_background_publisher(join_timeout_s=5.0)
 	assert summary is not None
 	assert summary.packet_count == 1
+
+
+def test_grab_wire_drop_newest_policy_counts_overflow() -> None:
+	wire = LiveMocapGrabPublishWire(max_queue_size=1)
+	wire.configure_overflow_policy(overflow_policy="drop_newest", put_timeout_ms=5)
+	img = np.zeros((2, 2, 3), dtype=np.uint8)
+	wire(
+		BaslerFrameSet(
+			anchor_utc_ns=1,
+			frames_by_camera={
+				0: BaslerFrame(camera_id=0, frame_index=0, capture_utc_ns=1, payload=img),
+			},
+		)
+	)
+	wire(
+		BaslerFrameSet(
+			anchor_utc_ns=2,
+			frames_by_camera={
+				0: BaslerFrame(camera_id=0, frame_index=1, capture_utc_ns=2, payload=img),
+			},
+		)
+	)
+	pub = NoOpRealtimePublisher()
+	wire.start_background_publisher(
+		publisher=pub,
+		inference_runtime=StubInferenceRuntime(),
+		triangulator=StubTriangulator(),
+		stale_threshold_ms=80.0,
+	)
+	for _ in range(200):
+		if wire.pending_count() == 0:
+			break
+		time.sleep(0.01)
+	summary = wire.stop_background_publisher(join_timeout_s=5.0)
+	assert summary is not None
+	assert summary.packet_count == 1
+	assert summary.queue_overflow_count == 1
+
+
+def test_grab_wire_block_with_timeout_policy_counts_overflow() -> None:
+	wire = LiveMocapGrabPublishWire(max_queue_size=1)
+	wire.configure_overflow_policy(overflow_policy="block_with_timeout", put_timeout_ms=1)
+	img = np.zeros((2, 2, 3), dtype=np.uint8)
+	wire(
+		BaslerFrameSet(
+			anchor_utc_ns=1,
+			frames_by_camera={
+				0: BaslerFrame(camera_id=0, frame_index=0, capture_utc_ns=1, payload=img),
+			},
+		)
+	)
+	wire(
+		BaslerFrameSet(
+			anchor_utc_ns=2,
+			frames_by_camera={
+				0: BaslerFrame(camera_id=0, frame_index=1, capture_utc_ns=2, payload=img),
+			},
+		)
+	)
+	pub = NoOpRealtimePublisher()
+	wire.start_background_publisher(
+		publisher=pub,
+		inference_runtime=StubInferenceRuntime(),
+		triangulator=StubTriangulator(),
+		stale_threshold_ms=80.0,
+	)
+	for _ in range(200):
+		if wire.pending_count() == 0:
+			break
+		time.sleep(0.01)
+	summary = wire.stop_background_publisher(join_timeout_s=5.0)
+	assert summary is not None
+	assert summary.packet_count == 1
+	assert summary.queue_overflow_count == 1
+
+
+def test_grab_wire_records_stage_errors(monkeypatch: pytest.MonkeyPatch) -> None:
+	wire = LiveMocapGrabPublishWire(max_queue_size=8)
+	pub = NoOpRealtimePublisher()
+	monkeypatch.setattr(
+		"src.ferret_gaze.realtime.grab_live_wiring.process_live_mocap_tick",
+		lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("stage boom")),
+	)
+	wire.start_background_publisher(
+		publisher=pub,
+		inference_runtime=StubInferenceRuntime(),
+		triangulator=StubTriangulator(),
+		stale_threshold_ms=80.0,
+	)
+	img = np.zeros((2, 2, 3), dtype=np.uint8)
+	wire(
+		BaslerFrameSet(
+			anchor_utc_ns=5,
+			frames_by_camera={
+				0: BaslerFrame(camera_id=0, frame_index=0, capture_utc_ns=5, payload=img),
+			},
+		)
+	)
+	time.sleep(0.05)
+	summary = wire.stop_background_publisher(join_timeout_s=5.0)
+	assert summary is not None
+	assert summary.packet_count == 0
+	assert summary.stage_error_count == 1
+
+
+def test_grab_wire_records_publish_errors() -> None:
+	class _FailingPublisher(NoOpRealtimePublisher):
+		def publish(self, packet):  # type: ignore[override]
+			_ = packet
+			raise RuntimeError("publish boom")
+
+	wire = LiveMocapGrabPublishWire(max_queue_size=8)
+	wire.start_background_publisher(
+		publisher=_FailingPublisher(),
+		inference_runtime=StubInferenceRuntime(),
+		triangulator=StubTriangulator(),
+		stale_threshold_ms=80.0,
+	)
+	img = np.zeros((2, 2, 3), dtype=np.uint8)
+	wire(
+		BaslerFrameSet(
+			anchor_utc_ns=8,
+			frames_by_camera={
+				0: BaslerFrame(camera_id=0, frame_index=0, capture_utc_ns=8, payload=img),
+			},
+		)
+	)
+	time.sleep(0.05)
+	summary = wire.stop_background_publisher(join_timeout_s=5.0)
+	assert summary is not None
+	assert summary.packet_count == 0
+	assert summary.publish_error_count == 1

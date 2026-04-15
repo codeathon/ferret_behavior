@@ -48,6 +48,22 @@ def run_acceptance_check(config_path: Path | None = None) -> int:
 		failures.append(
 			f"p95 end-to-end {summary.end_to_end_p95_ms:.2f}ms exceeds {config.acceptance_max_p95_ms:.2f}ms"
 		)
+	if summary.dropped_count > config.acceptance_max_dropped_count:
+		failures.append(
+			f"dropped packet count {summary.dropped_count} exceeds {config.acceptance_max_dropped_count}"
+		)
+	if summary.queue_overflow_count > config.acceptance_max_queue_overflow_count:
+		failures.append(
+			f"queue overflow count {summary.queue_overflow_count} exceeds {config.acceptance_max_queue_overflow_count}"
+		)
+	if summary.stage_error_count > config.acceptance_max_stage_error_count:
+		failures.append(
+			f"stage error count {summary.stage_error_count} exceeds {config.acceptance_max_stage_error_count}"
+		)
+	if summary.publish_error_count > config.acceptance_max_publish_error_count:
+		failures.append(
+			f"publish error count {summary.publish_error_count} exceeds {config.acceptance_max_publish_error_count}"
+		)
 	if summary.stale_count > 0:
 		failures.append(f"stale packet count nonzero: {summary.stale_count}")
 

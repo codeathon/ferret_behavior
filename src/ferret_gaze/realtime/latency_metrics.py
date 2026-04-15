@@ -27,6 +27,9 @@ class LatencySummary:
     process_p95_ms: float
     process_p99_ms: float
     stale_threshold_ms: float
+    queue_overflow_count: int = 0
+    stage_error_count: int = 0
+    publish_error_count: int = 0
 
 
 def _percentile_ms(samples_ns: list[int], percentile: float) -> float:
@@ -52,6 +55,9 @@ class RealtimeLatencyMetrics:
         self._packet_count = 0
         self._stale_count = 0
         self._dropped_count = 0
+        self._queue_overflow_count = 0
+        self._stage_error_count = 0
+        self._publish_error_count = 0
         self._last_seq: int | None = None
 
     def observe(self, packet: RealtimeGazePacket, now_utc_ns: int) -> None:
@@ -74,6 +80,21 @@ class RealtimeLatencyMetrics:
             self._dropped_count += seq - self._last_seq - 1
         self._last_seq = seq
 
+    def record_queue_overflow(self, count: int = 1) -> None:
+        """Count queue-overflow events from producer/consumer backpressure."""
+        if count > 0:
+            self._queue_overflow_count += int(count)
+
+    def record_stage_error(self, count: int = 1) -> None:
+        """Count per-frame compute failures (inference/triangulation/fuse)."""
+        if count > 0:
+            self._stage_error_count += int(count)
+
+    def record_publish_error(self, count: int = 1) -> None:
+        """Count publish backend failures while sending packets."""
+        if count > 0:
+            self._publish_error_count += int(count)
+
     def summary(self) -> LatencySummary:
         """Build immutable metrics summary for logging and tests."""
         return LatencySummary(
@@ -87,6 +108,9 @@ class RealtimeLatencyMetrics:
             process_p95_ms=_percentile_ms(self._process_latency_ns, 0.95),
             process_p99_ms=_percentile_ms(self._process_latency_ns, 0.99),
             stale_threshold_ms=self._stale_threshold_ms,
+            queue_overflow_count=self._queue_overflow_count,
+            stage_error_count=self._stage_error_count,
+            publish_error_count=self._publish_error_count,
         )
 
 
@@ -94,6 +118,7 @@ def format_latency_summary(summary: LatencySummary) -> str:
     """Return a compact one-line summary string for logs/CLI visibility."""
     return (
         "Realtime latency summary: packets={packets}, dropped={dropped}, stale={stale}"
+        ", queue_overflow={queue_overflow}, stage_errors={stage_errors}, publish_errors={publish_errors}"
         " (threshold_ms={threshold:.1f}), "
         "e2e_ms[p50/p95/p99]={e2e_p50:.2f}/{e2e_p95:.2f}/{e2e_p99:.2f}, "
         "process_ms[p50/p95/p99]={proc_p50:.2f}/{proc_p95:.2f}/{proc_p99:.2f}"
@@ -101,6 +126,9 @@ def format_latency_summary(summary: LatencySummary) -> str:
         packets=summary.packet_count,
         dropped=summary.dropped_count,
         stale=summary.stale_count,
+        queue_overflow=summary.queue_overflow_count,
+        stage_errors=summary.stage_error_count,
+        publish_errors=summary.publish_error_count,
         threshold=summary.stale_threshold_ms,
         e2e_p50=summary.end_to_end_p50_ms,
         e2e_p95=summary.end_to_end_p95_ms,
