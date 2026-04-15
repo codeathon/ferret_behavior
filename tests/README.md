@@ -16,6 +16,14 @@ tests/
 └── test_cameras.py             # Camera module: CameraProfile/CAMERAS, shared get_logger,
                                 #   timestamp_utils, VideoWriterManager guards,
                                 #   GrabLoopRunner pure logic
+
+# Realtime-focused tests
+├── test_realtime_transport.py      # packet schema, publisher factories, latency summary metrics
+├── test_realtime_per_frame_compute.py # inference/triangulation backend contracts and factories
+├── test_live_mocap_pipeline.py     # live tick/session orchestration (synthetic)
+├── test_live_mocap_grab_session.py # grab session wiring into live publish path
+├── test_grab_live_wiring.py        # queue policy, stage/publish error counters, consumer behavior
+└── test_realtime_pipeline_e2e.py   # config + factories end-to-end wiring for live_mocap mode
 ```
 
 ## Setup
@@ -92,6 +100,7 @@ uv run pytest -k "camera or timestamp"
 | `eye_analysis` | EyeType/EyeVideoData models, CSV load validation, function signature checks |
 | `utilities` | RecordingFolder construction, missing directory errors, eye assignment, all is_*/check_* methods, PipelineStep enum |
 | `cameras` | CameraProfile dataclass, CAMERAS single source of truth, derived constants (KNOWN_SERIALS, NO_BINNING_SERIALS), helper lookups, apply/configure camera settings, shared `get_logger` fallback, trim_timestamp_zeros, save_timestamps I/O, VideoWriterManager guard conditions, GrabLoopRunner seconds→frames math and drop-detection |
+| `realtime` | transport schema/publisher contracts, per-frame inference/triangulation adapters, live mocap orchestration, grab-to-live queue wiring, resilience counters (`queue_overflow`, `stage_error`, `publish_error`) |
 
 ### Not tested
 

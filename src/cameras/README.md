@@ -39,7 +39,8 @@ After the `camera_restructure` refactor, the acquisition code is split across fo
    uv run python src/cameras/run_recording.py
    ```
    or press the **Run** button in VSCode/Cursor.
-5. Recordings are saved to `/home/scholl-lab/recordings/<session_date>/<RECORDING_NAME>/raw_videos/`.
+5. Recordings are saved under the `BASE_OUTPUT_PATH` configured in `run_recording.py`, with a
+   date/session folder and `raw_videos/` beneath it.
 
 > **Recalibrate** if it is the first recording of the day or any camera has been moved.
 
