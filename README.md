@@ -99,10 +99,29 @@ uv run python src/batch_processing/full_pipeline.py
 Pass `overwrite_*` booleans to re-run specific stages (sync, calibration, DLC, triangulation, eye/skull/gaze postprocessing).
 
 ### Realtime scaffold pipeline (JSON config)
-Use the checked-in config scaffold at `configs/realtime.runtime.json` and call `run_pipeline(..., mode="realtime", realtime_config_path=...)` from Python:
+Use the checked-in scaffold at `configs/realtime.runtime.json` for synthetic bring-up, or the live preset at `configs/realtime.runtime.live.json` for camera-backed realtime runs.
+
+Run either config by calling `run_pipeline(..., mode="realtime", realtime_config_path=...)` from Python:
 ```bash
 uv run python -c "from pathlib import Path; from src.batch_processing.full_pipeline import run_pipeline; run_pipeline(recording_folder_path=Path('/tmp/full_recording'), mode='realtime', realtime_config_path=Path('configs/realtime.runtime.json'))"
 ```
+
+For live hardware, first set these fields in `configs/realtime.runtime.live.json`:
+- `inference_model_path` → absolute path to your ONNX model
+- `calibration_toml_path` → absolute path to session `*camera_calibration.toml`
+- optional: `live_mocap_grab_output_path` if you do not want output under the recording path
+
+Then run:
+```bash
+uv run python -c "from pathlib import Path; from src.batch_processing.full_pipeline import run_pipeline; run_pipeline(recording_folder_path=Path('/tmp/full_recording'), mode='realtime', realtime_config_path=Path('configs/realtime.runtime.live.json'))"
+```
+
+Realtime health checks for live sessions:
+- `acceptance_max_p95_ms`
+- `acceptance_max_dropped_count`
+- `acceptance_max_queue_overflow_count`
+- `acceptance_max_stage_error_count`
+- `acceptance_max_publish_error_count`
 
 ### Clip-level gaze pipeline
 Edit the clip path in `__main__` of `run_gaze_pipeline.py`, then:

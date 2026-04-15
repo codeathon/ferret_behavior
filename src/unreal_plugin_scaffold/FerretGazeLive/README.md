@@ -99,9 +99,17 @@ UE 4.27 and other 4.x builds often fail on current Apple Clang; use UE5 for macO
 
 - Use centralized runtime config:
 	- `src/ferret_gaze/realtime/runtime_config.py`
+- Use checked-in config presets:
+	- scaffold / synthetic: `configs/realtime.runtime.json`
+	- live hardware baseline: `configs/realtime.runtime.live.json` (replace model + calibration paths before running)
 - Run acceptance checklist:
 	- `uv run python src/ferret_gaze/realtime/step9_acceptance_check.py`
 	- optional config file: `--config /path/to/realtime_config.json`
+- Acceptance now supports resilience counters in addition to latency:
+	- `acceptance_max_dropped_count`
+	- `acceptance_max_queue_overflow_count`
+	- `acceptance_max_stage_error_count`
+	- `acceptance_max_publish_error_count`
 - Receiver now logs transport events with counters:
 	- connection state transitions
 	- reconnect attempts
