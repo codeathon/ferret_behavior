@@ -1,6 +1,8 @@
 """Realtime gaze transport scaffold package."""
 
 from src.ferret_gaze.realtime.gaze_packet import RealtimeGazePacket
+from src.ferret_gaze.realtime.live_frame_set import LiveMocapFrameSet
+from src.ferret_gaze.realtime.packet_serialize import gaze_packet_to_wire_dict
 from src.ferret_gaze.realtime.latency_metrics import (
     LatencySummary,
     RealtimeLatencyMetrics,
@@ -51,6 +53,8 @@ from src.ferret_gaze.realtime.solver_benchmark import (
 
 __all__ = [
     "RealtimeGazePacket",
+    "LiveMocapFrameSet",
+    "gaze_packet_to_wire_dict",
     "LatencySummary",
     "RealtimeLatencyMetrics",
     "FrameInferenceResult",

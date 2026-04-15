@@ -2,6 +2,7 @@
   "transport_backend": "noop",
   "transport_endpoint": "tcp://127.0.0.1:5556",
   "transport_topic": "gaze.live",
+  "transport_payload_format": "msgpack",
   "transport_packets": 120,
   "transport_hz": 60.0,
   "stale_threshold_ms": 80.0,

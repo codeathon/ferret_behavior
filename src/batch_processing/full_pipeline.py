@@ -335,6 +335,7 @@ def _run_realtime_pipeline(
         backend=runtime_config.transport_backend,
         endpoint=runtime_config.transport_endpoint,
         topic=runtime_config.transport_topic,
+        payload_format=runtime_config.transport_payload_format,
     )
     summary = run_realtime_transport_scaffold(
         publisher=publisher,

@@ -36,10 +36,6 @@ from src.kinematics_core.reference_geometry_model import (
 )
 from src.kinematics_core.rigid_body_kinematics_model import RigidBodyKinematics
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(levelname)s | %(message)s",
-)
 logger = get_logger(__name__)
 
 

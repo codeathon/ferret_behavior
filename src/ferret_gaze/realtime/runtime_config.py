@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -21,6 +21,7 @@ class RealtimeRuntimeConfig(BaseModel):
 	transport_backend: str = Field(default="noop")
 	transport_endpoint: str = Field(default="tcp://127.0.0.1:5556")
 	transport_topic: str = Field(default="gaze.live")
+	transport_payload_format: Literal["json", "msgpack"] = Field(default="msgpack")
 
 	transport_packets: int = Field(default=120, ge=1)
 	transport_hz: float = Field(default=60.0, gt=0.0)

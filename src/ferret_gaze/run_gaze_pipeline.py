@@ -94,10 +94,6 @@ from src.ferret_gaze.data_resampling.ferret_data_resampler import (
 )
 from src.kinematics_core.reference_geometry_model import ReferenceGeometry
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(levelname)s | %(message)s",
-)
 logger = get_logger(__name__)
 
 

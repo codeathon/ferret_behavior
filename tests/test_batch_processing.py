@@ -35,6 +35,9 @@ from src.batch_processing.full_pipeline import (
     EYE_DLC_ITERATION,
     TOY_DLC_ITERATION,
 )
+from src.ferret_gaze.realtime.latency_metrics import LatencySummary
+from src.ferret_gaze.realtime.runtime_config import RealtimeRuntimeConfig
+from src.ferret_gaze.realtime.solver_benchmark import SolverBenchmarkComparison, SolverBenchmarkStats
 
 
 # =============================================================================
@@ -79,6 +82,7 @@ class TestOverwriteFlagCascade:
         rf.is_eye_postprocessed.return_value = eye_postprocessed
         rf.is_skull_postprocessed.return_value = skull_postprocessed
         rf.is_gaze_postprocessed.return_value = gaze_postprocessed
+        # Real paths + skellyclicker_metadata.json avoid false "outdated DLC" in overwrite resolver.
         rf.head_body_dlc_output = head_dlc_output
         rf.eye_dlc_output = eye_dlc_output
         rf.toy_dlc_output = toy_dlc_output
@@ -98,7 +102,23 @@ class TestOverwriteFlagCascade:
             return mock_sync, mock_cal, mock_dlc, mock_tri, mock_post
 
     def test_all_up_to_date_no_steps_run(self, tmp_path):
-        mock_rf = self._make_mock_recording_folder()
+        def _write_dlc_meta(folder: Path, iteration: int) -> None:
+            folder.mkdir(parents=True, exist_ok=True)
+            (folder / "skellyclicker_metadata.json").write_text(
+                json.dumps({"iteration": iteration}), encoding="utf-8"
+            )
+
+        head_out = tmp_path / "head_dlc"
+        eye_out = tmp_path / "eye_dlc"
+        toy_out = tmp_path / "toy_dlc"
+        _write_dlc_meta(head_out, HEAD_DLC_ITERATION)
+        _write_dlc_meta(eye_out, EYE_DLC_ITERATION)
+        _write_dlc_meta(toy_out, TOY_DLC_ITERATION)
+        mock_rf = self._make_mock_recording_folder(
+            head_dlc_output=head_out,
+            eye_dlc_output=eye_out,
+            toy_dlc_output=toy_out,
+        )
         mock_sync, mock_cal, mock_dlc, mock_tri, mock_post = self._run_pipeline_with_flags(tmp_path, mock_rf)
         mock_sync.assert_not_called()
         mock_cal.assert_not_called()
@@ -181,7 +201,7 @@ class TestPipelineModeScaffold:
     def test_realtime_pipeline_uses_configured_triangulation_backend(self, tmp_path):
         # Realtime mode should build the triangulator from runtime config.
         config_path = tmp_path / "realtime.runtime.json"
-        runtime_config = MagicMock(
+        runtime_config = RealtimeRuntimeConfig(
             transport_backend="noop",
             transport_endpoint="tcp://127.0.0.1:5556",
             transport_topic="gaze.live",
@@ -195,11 +215,43 @@ class TestPipelineModeScaffold:
             onnx_provider="CPUExecutionProvider",
             triangulation_backend="stub",
         )
+        transport_summary = LatencySummary(
+            packet_count=0,
+            dropped_count=0,
+            stale_count=0,
+            end_to_end_p50_ms=0.0,
+            end_to_end_p95_ms=0.0,
+            end_to_end_p99_ms=0.0,
+            process_p50_ms=0.0,
+            process_p95_ms=0.0,
+            process_p99_ms=0.0,
+            stale_threshold_ms=80.0,
+        )
+        stub_stat = SolverBenchmarkStats(
+            solver_name="ukf_stub",
+            packet_count=0,
+            mean_solver_latency_ms=0.0,
+            p95_solver_latency_ms=0.0,
+            mean_position_error_mm=0.0,
+            mean_quaternion_l1_error=0.0,
+        )
+        stub_comparison = SolverBenchmarkComparison(
+            ukf=stub_stat,
+            ceres=stub_stat,
+            recommended_solver="ukf_stub",
+            recommendation_reason="test",
+        )
         with patch("src.batch_processing.full_pipeline.load_realtime_runtime_config", return_value=runtime_config) as mock_load_runtime_config, \
              patch("src.batch_processing.full_pipeline.create_realtime_publisher"), \
-             patch("src.batch_processing.full_pipeline.run_realtime_transport_scaffold"), \
+             patch(
+                 "src.batch_processing.full_pipeline.run_realtime_transport_scaffold",
+                 return_value=transport_summary,
+             ), \
              patch("src.batch_processing.full_pipeline.build_synthetic_replay_packets", return_value=[]), \
-             patch("src.batch_processing.full_pipeline.compare_stub_solvers"), \
+             patch(
+                 "src.batch_processing.full_pipeline.compare_stub_solvers",
+                 return_value=stub_comparison,
+             ), \
              patch("src.batch_processing.full_pipeline.create_inference_runtime"), \
              patch("src.batch_processing.full_pipeline.create_triangulator") as mock_create_triangulator, \
              patch("src.batch_processing.full_pipeline.run_realtime_compute_scaffold", return_value=[]):

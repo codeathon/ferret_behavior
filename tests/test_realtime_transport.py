@@ -12,6 +12,8 @@ from src.ferret_gaze.realtime.latency_metrics import (
     RealtimeLatencyMetrics,
     format_latency_summary,
 )
+from src.ferret_gaze.realtime.live_frame_set import LiveMocapFrameSet
+from src.ferret_gaze.realtime.packet_serialize import gaze_packet_to_wire_dict
 from src.ferret_gaze.realtime.publisher import (
     NoOpRealtimePublisher,
     RealtimePublisher,
@@ -84,6 +86,65 @@ def test_publisher_factory_returns_noop_backend() -> None:
 def test_publisher_factory_rejects_unknown_backend() -> None:
     with pytest.raises(ValueError):
         create_realtime_publisher("unknown")
+
+
+def test_publisher_factory_rejects_bad_payload_format() -> None:
+    with pytest.raises(ValueError):
+        create_realtime_publisher("zmq", payload_format="yaml")
+
+
+def test_gaze_packet_to_wire_dict_matches_unreal_keys() -> None:
+    packet = _sample_packet()
+    wire = gaze_packet_to_wire_dict(packet)
+    assert wire["seq"] == 0
+    assert wire["capture_utc_ns"] == 1
+    assert wire["process_start_ns"] == 1
+    assert wire["publish_utc_ns"] == 2
+    assert wire["skull_position_xyz"] == (0.0, 0.0, 0.0)
+    assert wire["skull_quaternion_wxyz"] == (1.0, 0.0, 0.0, 0.0)
+    assert wire["confidence"] == 1.0
+
+
+def test_gaze_packet_to_wire_dict_omits_none_optionals() -> None:
+    packet = RealtimeGazePacket(
+        seq=1,
+        capture_utc_ns=100,
+        process_start_ns=None,
+        publish_utc_ns=None,
+        skull_position_xyz=(0.0, 0.0, 0.0),
+        skull_quaternion_wxyz=(1.0, 0.0, 0.0, 0.0),
+        left_eye_origin_xyz=(0.0, 0.0, 0.0),
+        left_gaze_direction_xyz=(1.0, 0.0, 0.0),
+        right_eye_origin_xyz=(0.0, 0.0, 0.0),
+        right_gaze_direction_xyz=(1.0, 0.0, 0.0),
+        confidence=None,
+    )
+    wire = gaze_packet_to_wire_dict(packet)
+    assert "process_start_ns" not in wire
+    assert "publish_utc_ns" not in wire
+    assert "confidence" not in wire
+
+
+def test_msgpack_wire_payload_unpacks_to_map() -> None:
+    import msgpack
+
+    packet = _sample_packet()
+    raw = msgpack.packb(gaze_packet_to_wire_dict(packet), use_bin_type=False)
+    data = msgpack.unpackb(raw, raw=False)
+    assert isinstance(data, dict)
+    assert data["seq"] == 0
+    assert list(data["skull_position_xyz"]) == [0.0, 0.0, 0.0]
+
+
+def test_live_mocap_frame_set_dataclass() -> None:
+    import numpy as np
+
+    img = np.zeros((2, 2, 3), dtype=np.uint8)
+    fs = LiveMocapFrameSet(seq=3, anchor_utc_ns=1_000, images_bgr={0: img})
+    assert fs.seq == 3
+    assert fs.anchor_utc_ns == 1_000
+    assert 0 in fs.images_bgr
+    assert fs.camera_serial_by_index == {}
 
 
 def test_scaffold_runner_emits_requested_packet_count() -> None:
