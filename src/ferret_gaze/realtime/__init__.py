@@ -14,10 +14,12 @@ from src.ferret_gaze.realtime.latency_metrics import (
     RealtimeLatencyMetrics,
     format_latency_summary,
 )
+from src.ferret_gaze.realtime.multiview_triangulation import triangulate_linear_dlt
 from src.ferret_gaze.realtime.per_frame_compute import (
     OnnxInferenceRuntime,
     FrameInferenceResult,
     KeypointCentroidTriangulator,
+    MultiviewOpenCvTriangulator,
     RealtimeGazeFuser,
     RealtimeInferenceRuntime,
     RealtimeTriangulator,
@@ -69,6 +71,8 @@ __all__ = [
     "RealtimeLatencyMetrics",
     "FrameInferenceResult",
     "KeypointCentroidTriangulator",
+    "MultiviewOpenCvTriangulator",
+    "triangulate_linear_dlt",
     "TriangulationResult",
     "RollingCalibrationState",
     "RealtimeInferenceRuntime",

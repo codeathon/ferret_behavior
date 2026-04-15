@@ -10,11 +10,18 @@ from __future__ import annotations
 
 import math
 from abc import ABC, abstractmethod
+
+import numpy as np
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
+from src.ferret_gaze.realtime.calibration_projection import (
+    SessionMultiViewCalibration,
+    load_session_multi_view_calibration,
+)
 from src.ferret_gaze.realtime.gaze_packet import RealtimeGazePacket
+from src.ferret_gaze.realtime.multiview_triangulation import triangulate_linear_dlt
 
 
 @dataclass(frozen=True)
@@ -24,6 +31,8 @@ class FrameInferenceResult:
     seq: int
     confidence: float
     keypoints_xyz: tuple[tuple[float, float, float], ...] = ()
+    # Optional multi-view 2D pixels for one skull proxy landmark: (cam_index, u, v) per view.
+    single_landmark_uv_by_cam: tuple[tuple[int, float, float], ...] = ()
 
 
 @dataclass(frozen=True)
@@ -85,7 +94,7 @@ class StubInferenceRuntime(RealtimeInferenceRuntime):
 
     def infer(self, packet: RealtimeGazePacket) -> FrameInferenceResult:
         confidence = max(0.0, min(1.0, 0.92 + 0.05 * math.sin(packet.seq * 0.05)))
-        return FrameInferenceResult(seq=packet.seq, confidence=confidence)
+        return FrameInferenceResult(seq=packet.seq, confidence=confidence, single_landmark_uv_by_cam=())
 
 
 class OnnxInferenceRuntime(RealtimeInferenceRuntime):
@@ -170,6 +179,7 @@ class OnnxInferenceRuntime(RealtimeInferenceRuntime):
             seq=packet.seq,
             confidence=confidence,
             keypoints_xyz=keypoints_xyz,
+            single_landmark_uv_by_cam=(),
         )
 
 
@@ -199,6 +209,46 @@ class StubTriangulator(RealtimeTriangulator):
         y = 0.1 * math.cos(inference.seq * 0.03)
         z = 0.02 * math.sin(inference.seq * 0.02)
         return TriangulationResult(seq=inference.seq, skull_position_xyz=(x, y, z))
+
+
+class MultiviewOpenCvTriangulator(RealtimeTriangulator):
+    """
+    Triangulate one landmark from multi-view pixels and session ``P`` matrices.
+
+    Expects ``FrameInferenceResult.single_landmark_uv_by_cam`` with at least
+    two views whose camera indices exist in the loaded calibration. Falls back
+    to ``KeypointCentroidTriangulator`` when UV tracks are missing or too few
+    views are available.
+    """
+
+    def __init__(self, calibration: SessionMultiViewCalibration) -> None:
+        self._calibration = calibration
+        self._fallback = KeypointCentroidTriangulator()
+
+    def triangulate(self, inference: FrameInferenceResult) -> TriangulationResult:
+        obs = inference.single_landmark_uv_by_cam
+        if len(obs) < 2:
+            return self._fallback.triangulate(inference)
+
+        projections: list[np.ndarray] = []
+        uv_pixels: list[np.ndarray] = []
+        for cam_id, u, v in obs:
+            if cam_id not in self._calibration.projection_by_cam_index:
+                continue
+            projections.append(self._calibration.projection_matrix(cam_id))
+            uv_pixels.append(np.array([u, v], dtype=np.float64))
+        if len(projections) < 2:
+            return self._fallback.triangulate(inference)
+
+        try:
+            xyz = triangulate_linear_dlt(projections, uv_pixels)
+        except (ValueError, np.linalg.LinAlgError):
+            return self._fallback.triangulate(inference)
+
+        return TriangulationResult(
+            seq=inference.seq,
+            skull_position_xyz=(float(xyz[0]), float(xyz[1]), float(xyz[2])),
+        )
 
 
 class KeypointCentroidTriangulator(RealtimeTriangulator):
@@ -304,13 +354,23 @@ def create_inference_runtime(
 
 
 def create_triangulator(
-    backend: Literal["keypoint_centroid", "stub"] = "keypoint_centroid",
+    backend: Literal["keypoint_centroid", "stub", "multiview_opencv"] = "keypoint_centroid",
+    *,
+    calibration_toml_path: Path | None = None,
 ) -> RealtimeTriangulator:
     """
     Build triangulator from backend selection.
+
+    ``multiview_opencv`` requires ``calibration_toml_path`` to a freemocap-style
+    ``*camera_calibration.toml`` (see ``load_session_multi_view_calibration``).
     """
     if backend == "keypoint_centroid":
         return KeypointCentroidTriangulator()
     if backend == "stub":
         return StubTriangulator()
+    if backend == "multiview_opencv":
+        if calibration_toml_path is None:
+            raise ValueError("calibration_toml_path is required for multiview_opencv triangulation backend")
+        calib = load_session_multi_view_calibration(calibration_toml_path)
+        return MultiviewOpenCvTriangulator(calibration=calib)
     raise ValueError(f"Unsupported triangulation backend: {backend}")

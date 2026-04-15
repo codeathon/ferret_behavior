@@ -261,4 +261,7 @@ class TestPipelineModeScaffold:
                 realtime_config_path=config_path,
             )
             mock_load_runtime_config.assert_called_once_with(config_path=config_path)
-            mock_create_triangulator.assert_called_once_with(backend="stub")
+            mock_create_triangulator.assert_called_once_with(
+                backend="stub",
+                calibration_toml_path=None,
+            )

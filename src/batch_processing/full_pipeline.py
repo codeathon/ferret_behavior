@@ -375,7 +375,12 @@ def _run_realtime_pipeline(
     computed_packets = run_realtime_compute_scaffold(
         compute_input,
         inference_runtime=inference_runtime,
-        triangulator=create_triangulator(backend=runtime_config.triangulation_backend),
+        triangulator=create_triangulator(
+            backend=runtime_config.triangulation_backend,
+            calibration_toml_path=Path(runtime_config.calibration_toml_path)
+            if runtime_config.calibration_toml_path
+            else None,
+        ),
     )
     mean_confidence = (
         sum(packet.confidence or 0.0 for packet in computed_packets) / len(computed_packets)
