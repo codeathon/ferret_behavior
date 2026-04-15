@@ -11,9 +11,15 @@ from src.ferret_gaze.realtime.live_mocap_pipeline import (
     basler_frameset_to_live_mocap_frame_set,
     build_synthetic_live_mocap_frame_sets,
     gaze_packet_from_live_mocap_frame_set,
+    process_live_mocap_tick,
     run_live_mocap_compute_publish_session,
 )
-from src.ferret_gaze.realtime.per_frame_compute import StubInferenceRuntime, StubTriangulator
+from src.ferret_gaze.realtime.per_frame_compute import (
+    StubGazeFuser,
+    StubInferenceRuntime,
+    StubRollingEyeCalibrator,
+    StubTriangulator,
+)
 from src.ferret_gaze.realtime.publisher import NoOpRealtimePublisher
 
 
@@ -78,6 +84,18 @@ def test_run_live_mocap_compute_publish_session_smoke() -> None:
         stale_threshold_ms=80.0,
     )
     assert summary.packet_count == 2
+
+
+def test_process_live_mocap_tick_returns_fused_packet() -> None:
+    fs = build_synthetic_live_mocap_frame_sets(1, n_cams=1, height=4, width=4)[0]
+    fused = process_live_mocap_tick(
+        fs,
+        inference_runtime=StubInferenceRuntime(),
+        triangulator=StubTriangulator(),
+        calibrator=StubRollingEyeCalibrator(),
+        fuser=StubGazeFuser(),
+    )
+    assert fused.seq == fs.seq
 
 
 def test_run_live_mocap_rejects_non_positive_hz() -> None:

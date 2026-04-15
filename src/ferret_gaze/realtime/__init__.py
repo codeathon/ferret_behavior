@@ -42,10 +42,12 @@ from src.ferret_gaze.realtime.publisher import (
     ZmqRealtimePublisher,
     create_realtime_publisher,
 )
+from src.ferret_gaze.realtime.grab_live_wiring import LiveMocapGrabPublishWire
 from src.ferret_gaze.realtime.live_mocap_pipeline import (
     basler_frameset_to_live_mocap_frame_set,
     build_synthetic_live_mocap_frame_sets,
     gaze_packet_from_live_mocap_frame_set,
+    process_live_mocap_tick,
     run_live_mocap_compute_publish_session,
 )
 from src.ferret_gaze.realtime.scaffold_runner import (
@@ -107,6 +109,8 @@ __all__ = [
     "basler_frameset_to_live_mocap_frame_set",
     "build_synthetic_live_mocap_frame_sets",
     "run_live_mocap_compute_publish_session",
+    "process_live_mocap_tick",
+    "LiveMocapGrabPublishWire",
     "RealtimeRuntimeConfig",
     "load_realtime_runtime_config",
     "RealtimeSkullSolver",

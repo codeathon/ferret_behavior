@@ -107,6 +107,26 @@ def build_synthetic_live_mocap_frame_sets(
 	return out
 
 
+def process_live_mocap_tick(
+	frame_set: LiveMocapFrameSet,
+	*,
+	inference_runtime: RealtimeInferenceRuntime,
+	triangulator: RealtimeTriangulator,
+	calibrator: RollingEyeCalibrator,
+	fuser: RealtimeGazeFuser,
+) -> RealtimeGazePacket:
+	"""
+	Run infer -> triangulate -> calibrate -> fuse for one bundle (no publish).
+
+	Used by the grab queue consumer and by :func:`run_live_mocap_compute_publish_session`.
+	"""
+	packet = gaze_packet_from_live_mocap_frame_set(frame_set)
+	inference = inference_runtime.infer(packet, frame_set=frame_set)
+	triangulated = triangulator.triangulate(inference)
+	calibration = calibrator.update(triangulated)
+	return fuser.fuse(packet, triangulated, calibration, inference)
+
+
 def run_live_mocap_compute_publish_session(
 	*,
 	frame_sets: Sequence[LiveMocapFrameSet],
@@ -140,11 +160,13 @@ def run_live_mocap_compute_publish_session(
 	try:
 		for fs in frame_sets:
 			t_loop = time.perf_counter()
-			packet = gaze_packet_from_live_mocap_frame_set(fs)
-			inference = inference_runtime.infer(packet, frame_set=fs)
-			triangulated = triangulator.triangulate(inference)
-			calibration = calibrator.update(triangulated)
-			fused = fuser.fuse(packet, triangulated, calibration, inference)
+			fused = process_live_mocap_tick(
+				fs,
+				inference_runtime=inference_runtime,
+				triangulator=triangulator,
+				calibrator=calibrator,
+				fuser=fuser,
+			)
 			fused = fused.model_copy(update={"publish_utc_ns": time.time_ns()})
 			publisher.publish(fused)
 			metrics.observe(packet=fused, now_utc_ns=time.time_ns())
