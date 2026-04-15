@@ -16,7 +16,16 @@ from typing import Any
 
 @dataclass(frozen=True)
 class BaslerFrame:
-    """One captured Basler frame with UTC timestamp."""
+    """
+    One captured Basler frame for the live combiner and optional sinks.
+
+    ``capture_utc_ns`` is host-anchored UTC-like nanoseconds since Unix epoch:
+    grab-start ``TimestampMapping.utc_time_ns`` plus device timestamp delta
+    since latch for this camera. Offline ``timestamps.npy`` stays latch-relative.
+
+    ``payload`` is optional (e.g. BGR uint8 image when a live ``frameset_sink``
+    is configured on ``GrabLoopRunner``).
+    """
 
     camera_id: int
     frame_index: int

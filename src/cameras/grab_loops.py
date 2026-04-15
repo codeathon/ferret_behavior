@@ -22,9 +22,17 @@ from typing import Callable
 import numpy as np
 import pypylon.pylon as pylon
 
-from src.cameras.timestamp_utils import latch_timestamp_mapping, save_timestamps
+from src.cameras.synchronization.realtime_sync import (
+    BaslerFrame,
+    BaslerFrameSet,
+    BaslerFrameSetCombiner,
+)
+from src.cameras.timestamp_utils import (
+    basler_frame_utc_ns_from_latch_delta,
+    latch_timestamp_mapping,
+    save_timestamps,
+)
 from src.cameras.video_writers import VideoWriterManager
-from src.cameras.synchronization.realtime_sync import BaslerFrame, BaslerFrameSetCombiner
 
 logger = get_logger(__name__)
 
@@ -45,6 +53,10 @@ class GrabLoopRunner:
         fps: Recording frame rate (used to convert seconds → frames).
         writer: Initialised VideoWriterManager (ffmpeg writers must be created).
         output_path: Directory for timestamps output.
+        frameset_sink: If set, invoked on the combiner thread for each emitted
+            ``BaslerFrameSet``. When non-None, frame payloads include a BGR uint8
+            image copy (see ``BaslerFrame.payload``); keep the callback fast and
+            thread-safe.
     """
 
     def __init__(
@@ -56,6 +68,7 @@ class GrabLoopRunner:
         output_path,
         ring_size: int = 240,
         combiner_tolerance_ns: int = 2_000_000,
+        frameset_sink: Callable[[BaslerFrameSet], None] | None = None,
     ) -> None:
         self._camera_array = camera_array
         self._n_cameras = n_cameras
@@ -64,6 +77,7 @@ class GrabLoopRunner:
         self._output_path = output_path
         self._ring_size = ring_size
         self._combiner_tolerance_ns = combiner_tolerance_ns
+        self._frameset_sink = frameset_sink
 
     # ------------------------------------------------------------------
     # Public grab modes
@@ -197,6 +211,8 @@ class GrabLoopRunner:
                     frameset = combiner.ingest(item)
                     if frameset is not None:
                         frameset_count += 1
+                        if self._frameset_sink is not None:
+                            self._frameset_sink(frameset)
                 except Exception as exc:  # defensive: avoid silent thread death
                     combiner_error.append(exc)
                     combiner_stop.set()
@@ -212,6 +228,7 @@ class GrabLoopRunner:
         self.disable_throughput_limit()
         starting_mapping = latch_timestamp_mapping(self._camera_array)
         self.disable_throughput_limit()
+        grab_anchor_utc_ns = starting_mapping.utc_time_ns
 
         self._camera_array.StartGrabbing()
         self.set_fps_on_cameras()
@@ -225,10 +242,9 @@ class GrabLoopRunner:
                         cam_id = result.GetCameraContext()
                         frame_counts[cam_id] = image_number
 
-                        relative_ts = (
-                            result.GetTimeStamp()
-                            - starting_mapping.camera_timestamps[cam_id]
-                        )
+                        device_ts = int(result.GetTimeStamp())
+                        latched = int(starting_mapping.camera_timestamps[cam_id])
+                        relative_ts = device_ts - latched
                         logger.debug(f"Cam #{cam_id}  frame #{image_number}  ts: {relative_ts}")
 
                         try:
@@ -236,12 +252,24 @@ class GrabLoopRunner:
                         except IndexError:
                             pass  # Exceeded pre-allocated buffer; trimmed on save.
 
+                        utc_ns = basler_frame_utc_ns_from_latch_delta(
+                            device_timestamp=device_ts,
+                            latched_device_timestamp=latched,
+                            grab_anchor_utc_ns=grab_anchor_utc_ns,
+                        )
+                        payload = None
+                        if self._frameset_sink is not None:
+                            payload = np.ascontiguousarray(
+                                np.asarray(result.Array, dtype=np.uint8)
+                            )
+
                         try:
                             frame_queue.put_nowait(
                                 BaslerFrame(
                                     camera_id=cam_id,
                                     frame_index=image_number,
-                                    capture_utc_ns=int(relative_ts),
+                                    capture_utc_ns=utc_ns,
+                                    payload=payload,
                                 )
                             )
                         except queue.Full:

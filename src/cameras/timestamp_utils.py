@@ -50,6 +50,23 @@ def latch_timestamp_mapping(camera_array: pylon.InstantCameraArray) -> Timestamp
     return mapping
 
 
+def basler_frame_utc_ns_from_latch_delta(
+    *,
+    device_timestamp: int,
+    latched_device_timestamp: int,
+    grab_anchor_utc_ns: int,
+) -> int:
+    """
+    Map a Basler frame device counter to a host-anchored UTC-like instant (ns).
+
+    ``grab_anchor_utc_ns`` is typically ``TimestampMapping.utc_time_ns`` captured
+    when the start latch mapping was built; adding the device delta since latch
+    yields a timeline suitable for realtime combiners and ZMQ ``capture_utc_ns``.
+    """
+    delta = int(device_timestamp) - int(latched_device_timestamp)
+    return int(grab_anchor_utc_ns) + delta
+
+
 def trim_timestamp_zeros(timestamps: np.ndarray) -> np.ndarray:
     """
     Remove trailing zero columns from the timestamp array.

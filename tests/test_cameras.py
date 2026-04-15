@@ -502,3 +502,37 @@ class TestGrabLoopRunnerPureLogic:
             assert condition([50, 50]) is True
             assert condition([49, 50]) is False
             assert condition([51, 51]) is True
+
+
+# ===========================================================================
+# timestamp_utils — live grab UTC anchor (P1)
+# ===========================================================================
+
+from src.cameras.synchronization.realtime_sync import (  # noqa: E402
+    BaslerFrame,
+    BaslerFrameSetCombiner,
+)
+from src.cameras.timestamp_utils import basler_frame_utc_ns_from_latch_delta  # noqa: E402
+
+
+class TestBaslerLatchUtcAnchor:
+    def test_anchor_plus_device_delta(self) -> None:
+        assert (
+            basler_frame_utc_ns_from_latch_delta(
+                device_timestamp=1100,
+                latched_device_timestamp=1000,
+                grab_anchor_utc_ns=1_700_000_000_000,
+            )
+            == 1_700_000_000_100
+        )
+
+
+class TestBaslerFrameSetCombinerAnchoredUtc:
+    def test_emits_frameset_when_cameras_within_tolerance(self) -> None:
+        combiner = BaslerFrameSetCombiner(camera_ids=[0, 1], tolerance_ns=1_000_000)
+        anchor = 1_000_000_000_000
+        assert combiner.ingest(BaslerFrame(0, 1, anchor, None)) is None
+        out = combiner.ingest(BaslerFrame(1, 1, anchor + 500_000, None))
+        assert out is not None
+        assert out.anchor_utc_ns == anchor + 500_000
+        assert set(out.frames_by_camera.keys()) == {0, 1}

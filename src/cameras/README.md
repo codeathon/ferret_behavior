@@ -13,7 +13,7 @@ After the `camera_restructure` refactor, the acquisition code is split across fo
 | `camera_config.py` | `ImageShape`, per-serial default resolution/exposure/gain tables, `configure_all_cameras()`. |
 | `video_writers.py` | `VideoWriterManager` — ffmpeg and OpenCV writer backends, pipe tuning. |
 | `timestamp_utils.py` | `latch_timestamp_mapping()`, `trim_timestamp_zeros()`, `save_timestamps()`. |
-| `grab_loops.py` | `GrabLoopRunner` — frame retrieval loop and the three grab modes. |
+| `grab_loops.py` | `GrabLoopRunner` — frame retrieval loop and grab modes; optional `frameset_sink` for live frame-sets (BGR payloads); combiner uses host-anchored `capture_utc_ns`. |
 | `postprocess.py` | Post-recording sync, file moves, and `combine_videos` call. |
 | `synchronization/` | Timestamp synchronization across Basler and Pupil streams. |
 | `intrinsics/` | Per-camera lens calibration and distortion correction. |
