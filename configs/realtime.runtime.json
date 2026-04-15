@@ -11,6 +11,9 @@
   "inference_backend": "stub",
   "inference_model_path": null,
   "onnx_provider": "CPUExecutionProvider",
+  "inference_images_height": 256,
+  "inference_images_width": 256,
+  "inference_output_uv_normalized": false,
   "triangulation_backend": "keypoint_centroid",
   "calibration_toml_path": null,
   "acceptance_max_p95_ms": 80.0

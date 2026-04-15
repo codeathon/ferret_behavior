@@ -371,6 +371,9 @@ def _run_realtime_pipeline(
         if runtime_config.inference_model_path
         else None,
         provider=runtime_config.onnx_provider,
+        images_input_height=runtime_config.inference_images_height,
+        images_input_width=runtime_config.inference_images_width,
+        output_uv_normalized=runtime_config.inference_output_uv_normalized,
     )
     computed_packets = run_realtime_compute_scaffold(
         compute_input,

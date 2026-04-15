@@ -32,6 +32,11 @@ class RealtimeRuntimeConfig(BaseModel):
 	inference_backend: str = Field(default="stub")
 	inference_model_path: str | None = Field(default=None)
 	onnx_provider: str = Field(default="CPUExecutionProvider")
+	# Used by ``onnx_images`` backend: resize each camera crop before NCHW feed.
+	inference_images_height: int = Field(default=256, ge=1)
+	inference_images_width: int = Field(default=256, ge=1)
+	# If true, model outputs u,v in [0,1] relative to the resized input; else in resized pixel units.
+	inference_output_uv_normalized: bool = Field(default=False)
 	triangulation_backend: str = Field(default="keypoint_centroid")
 	# Optional explicit path to *camera_calibration.toml (defaults to session discovery in live path).
 	calibration_toml_path: str | None = Field(default=None)
