@@ -12,5 +12,6 @@
   "inference_model_path": null,
   "onnx_provider": "CPUExecutionProvider",
   "triangulation_backend": "keypoint_centroid",
+  "calibration_toml_path": null,
   "acceptance_max_p95_ms": 80.0
 }

@@ -3,6 +3,12 @@
 from src.ferret_gaze.realtime.gaze_packet import RealtimeGazePacket
 from src.ferret_gaze.realtime.live_frame_set import LiveMocapFrameSet
 from src.ferret_gaze.realtime.packet_serialize import gaze_packet_to_wire_dict
+from src.ferret_gaze.realtime.calibration_projection import (
+    SessionMultiViewCalibration,
+    discover_session_calibration_toml,
+    load_session_multi_view_calibration,
+    projection_matrix_from_cam_block,
+)
 from src.ferret_gaze.realtime.latency_metrics import (
     LatencySummary,
     RealtimeLatencyMetrics,
@@ -55,6 +61,10 @@ __all__ = [
     "RealtimeGazePacket",
     "LiveMocapFrameSet",
     "gaze_packet_to_wire_dict",
+    "SessionMultiViewCalibration",
+    "discover_session_calibration_toml",
+    "load_session_multi_view_calibration",
+    "projection_matrix_from_cam_block",
     "LatencySummary",
     "RealtimeLatencyMetrics",
     "FrameInferenceResult",

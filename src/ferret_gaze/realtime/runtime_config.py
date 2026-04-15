@@ -33,6 +33,8 @@ class RealtimeRuntimeConfig(BaseModel):
 	inference_model_path: str | None = Field(default=None)
 	onnx_provider: str = Field(default="CPUExecutionProvider")
 	triangulation_backend: str = Field(default="keypoint_centroid")
+	# Optional explicit path to *camera_calibration.toml (defaults to session discovery in live path).
+	calibration_toml_path: str | None = Field(default=None)
 
 	acceptance_max_p95_ms: float = Field(default=80.0, gt=0.0)
 
