@@ -46,10 +46,35 @@ class RealtimeRuntimeConfig(BaseModel):
 	# Orchestration: ``scaffold`` = synthetic transport + replay compute (legacy).
 	# ``live_mocap`` = frame bundles -> infer -> triangulate -> publish (see live_mocap_pipeline).
 	realtime_mode: Literal["scaffold", "live_mocap"] = Field(default="scaffold")
-	live_mocap_frame_source: Literal["synthetic"] = Field(default="synthetic")
+	# ``synthetic`` = offline bundles; ``grab`` = Basler MultiCameraRecording + frameset_sink wire.
+	live_mocap_frame_source: Literal["synthetic", "grab"] = Field(default="synthetic")
 	live_mocap_synthetic_camera_count: int = Field(default=2, ge=1)
 	live_mocap_synthetic_height: int = Field(default=64, ge=1)
 	live_mocap_synthetic_width: int = Field(default=64, ge=1)
+	# --- grab-backed live_mocap (requires cameras + pylon) ---
+	live_mocap_grab_output_path: str | None = Field(
+		default=None,
+		description="Directory for raw video output; defaults to run_pipeline recording_folder_path.",
+	)
+	live_mocap_grab_n_frames: int | None = Field(
+		default=None,
+		ge=1,
+		description="Frames to grab; defaults to transport_packets when unset.",
+	)
+	live_mocap_grab_nir_only: bool = Field(default=False)
+	live_mocap_grab_fps: float | None = Field(
+		default=None,
+		gt=0.0,
+		description="Acquisition FPS; defaults to transport_hz when unset.",
+	)
+	live_mocap_grab_binning_factor: int = Field(default=2, ge=1, le=4)
+	live_mocap_grab_hardware_trigger: bool = Field(default=True)
+	live_mocap_grab_wire_queue_size: int = Field(default=32, ge=1)
+	live_mocap_grab_pace_hz: float | None = Field(
+		default=None,
+		gt=0.0,
+		description="Optional max publish rate for the consumer thread (None = no extra pacing).",
+	)
 
 
 def load_realtime_runtime_config(config_path: Path | None = None) -> RealtimeRuntimeConfig:

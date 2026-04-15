@@ -43,6 +43,7 @@ from src.ferret_gaze.realtime.publisher import (
     create_realtime_publisher,
 )
 from src.ferret_gaze.realtime.grab_live_wiring import LiveMocapGrabPublishWire
+from src.ferret_gaze.realtime.live_mocap_grab_session import run_live_mocap_grab_n_frames_publish
 from src.ferret_gaze.realtime.live_mocap_pipeline import (
     basler_frameset_to_live_mocap_frame_set,
     build_synthetic_live_mocap_frame_sets,
@@ -111,6 +112,7 @@ __all__ = [
     "run_live_mocap_compute_publish_session",
     "process_live_mocap_tick",
     "LiveMocapGrabPublishWire",
+    "run_live_mocap_grab_n_frames_publish",
     "RealtimeRuntimeConfig",
     "load_realtime_runtime_config",
     "RealtimeSkullSolver",

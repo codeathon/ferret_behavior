@@ -28,6 +28,7 @@ from src.ferret_gaze.realtime import (
     run_realtime_compute_scaffold,
     run_realtime_transport_scaffold,
 )
+from src.ferret_gaze.realtime.live_mocap_grab_session import run_live_mocap_grab_n_frames_publish
 from src.ferret_gaze.realtime.live_mocap_pipeline import (
     build_synthetic_live_mocap_frame_sets,
     run_live_mocap_compute_publish_session,
@@ -383,34 +384,73 @@ def _run_realtime_pipeline(
     )
 
     if runtime_config.realtime_mode == "live_mocap":
-        if runtime_config.live_mocap_frame_source != "synthetic":
-            raise ValueError(
-                f"Unsupported live_mocap_frame_source: {runtime_config.live_mocap_frame_source!r}"
-            )
-        logger.info(
-            "Starting live_mocap session (synthetic frame bundles, ticks=%d)",
-            runtime_config.transport_packets,
-        )
-        frame_sets = build_synthetic_live_mocap_frame_sets(
-            runtime_config.transport_packets,
-            n_cams=runtime_config.live_mocap_synthetic_camera_count,
-            height=runtime_config.live_mocap_synthetic_height,
-            width=runtime_config.live_mocap_synthetic_width,
-        )
         publisher = create_realtime_publisher(
             backend=runtime_config.transport_backend,
             endpoint=runtime_config.transport_endpoint,
             topic=runtime_config.transport_topic,
             payload_format=runtime_config.transport_payload_format,
         )
-        run_live_mocap_compute_publish_session(
-            frame_sets=frame_sets,
-            publisher=publisher,
-            inference_runtime=inference_runtime,
-            triangulator=triangulator,
-            hz=runtime_config.transport_hz,
-            stale_threshold_ms=runtime_config.stale_threshold_ms,
-        )
+        session_closed_publisher = False
+        try:
+            if runtime_config.live_mocap_frame_source == "synthetic":
+                logger.info(
+                    "Starting live_mocap session (synthetic frame bundles, ticks=%d)",
+                    runtime_config.transport_packets,
+                )
+                frame_sets = build_synthetic_live_mocap_frame_sets(
+                    runtime_config.transport_packets,
+                    n_cams=runtime_config.live_mocap_synthetic_camera_count,
+                    height=runtime_config.live_mocap_synthetic_height,
+                    width=runtime_config.live_mocap_synthetic_width,
+                )
+                run_live_mocap_compute_publish_session(
+                    frame_sets=frame_sets,
+                    publisher=publisher,
+                    inference_runtime=inference_runtime,
+                    triangulator=triangulator,
+                    hz=runtime_config.transport_hz,
+                    stale_threshold_ms=runtime_config.stale_threshold_ms,
+                )
+                session_closed_publisher = True
+            elif runtime_config.live_mocap_frame_source == "grab":
+                grab_out = (
+                    Path(runtime_config.live_mocap_grab_output_path)
+                    if runtime_config.live_mocap_grab_output_path
+                    else recording_folder_path
+                )
+                n_frames = runtime_config.live_mocap_grab_n_frames or runtime_config.transport_packets
+                grab_fps = (
+                    runtime_config.live_mocap_grab_fps
+                    if runtime_config.live_mocap_grab_fps is not None
+                    else runtime_config.transport_hz
+                )
+                logger.info(
+                    "Starting live_mocap grab session: output=%s, n_frames=%d, fps=%.2f",
+                    grab_out,
+                    n_frames,
+                    grab_fps,
+                )
+                run_live_mocap_grab_n_frames_publish(
+                    output_path=grab_out,
+                    nir_only=runtime_config.live_mocap_grab_nir_only,
+                    fps=float(grab_fps),
+                    binning_factor=runtime_config.live_mocap_grab_binning_factor,
+                    hardware_triggering=runtime_config.live_mocap_grab_hardware_trigger,
+                    n_frames=int(n_frames),
+                    publisher=publisher,
+                    inference_runtime=inference_runtime,
+                    triangulator=triangulator,
+                    stale_threshold_ms=runtime_config.stale_threshold_ms,
+                    wire_queue_size=runtime_config.live_mocap_grab_wire_queue_size,
+                    pace_hz=runtime_config.live_mocap_grab_pace_hz,
+                )
+            else:
+                raise ValueError(
+                    f"Unsupported live_mocap_frame_source: {runtime_config.live_mocap_frame_source!r}"
+                )
+        finally:
+            if not session_closed_publisher:
+                publisher.close()
         logger.info("Realtime live_mocap session complete")
         return
 
