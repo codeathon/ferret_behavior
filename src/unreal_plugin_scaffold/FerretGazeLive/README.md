@@ -107,3 +107,14 @@ UE 4.27 and other 4.x builds often fail on current Apple Clang; use UE5 for macO
 	- reconnect attempts
 	- receive errors
 	- drop spikes (every +120 dropped packets)
+
+## Unreal end-to-end acceptance harness (opt-in)
+
+For local/nightly validation with a real Unreal Editor instance, run:
+
+- `uv run python src/ferret_gaze/realtime/unreal_e2e_acceptance.py --unreal-bin "/Path/To/UnrealEditor" --uproject "/Path/To/Project.uproject" --map "/Game/Maps/YourMap"`
+
+This harness launches Unreal, starts the smoke publisher, and parses Unreal log
+telemetry (`GazeSubscriber ...`, `GazeRender stats ...`) for pass/fail checks
+such as minimum sequence progress, applied packet count, and error/drop limits.
+It is intended for acceptance testing, not default CI.
