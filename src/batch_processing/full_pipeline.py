@@ -372,6 +372,9 @@ def _run_realtime_pipeline(
         kabsch_reference_npy=Path(runtime_config.skull_solver_kabsch_reference_npy)
         if runtime_config.skull_solver_kabsch_reference_npy
         else None,
+        ceres_window_size=runtime_config.skull_solver_ceres_window_size,
+        ceres_soft_l1_f_scale=runtime_config.skull_solver_ceres_soft_l1_f_scale,
+        ceres_max_nfev=runtime_config.skull_solver_ceres_max_nfev,
     )
     eye_calibrator = create_eye_calibrator(
         runtime_config.eye_calibrator_backend,

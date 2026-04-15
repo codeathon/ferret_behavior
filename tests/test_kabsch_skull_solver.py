@@ -51,7 +51,7 @@ def test_create_skull_solver_none_returns_none() -> None:
 
 def test_create_skull_solver_unknown_raises() -> None:
     with pytest.raises(ValueError, match="Unsupported"):
-        create_skull_solver("ceres")  # type: ignore[arg-type]
+        create_skull_solver("not_a_solver_backend")  # type: ignore[arg-type]
 
 
 def test_load_kabsch_reference_body_round_trip(tmp_path: Path) -> None:

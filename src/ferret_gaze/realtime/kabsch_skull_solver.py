@@ -134,15 +134,19 @@ class KabschRealtimeSkullSolver(RealtimeSkullSolver):
 
 
 def create_skull_solver(
-	backend: Literal["none", "kabsch"] | str,
+	backend: Literal["none", "kabsch", "ceres"] | str,
 	*,
 	kabsch_reference_npy: Path | None = None,
+	ceres_window_size: int = 1,
+	ceres_soft_l1_f_scale: float | None = None,
+	ceres_max_nfev: int = 100,
 ) -> RealtimeSkullSolver | None:
 	"""
 	Factory for optional skull solvers used on the live mocap path.
 
 	``kabsch`` loads ``kabsch_reference_npy`` when set; otherwise uses
-	``DEFAULT_KABSCH_REFERENCE_BODY``.
+	``DEFAULT_KABSCH_REFERENCE_BODY``. ``ceres`` uses the same template path
+	and runs a sliding-window nonlinear SE(3) fit (SciPy ``least_squares``).
 	"""
 	b = str(backend).strip().lower()
 	if b in ("", "none"):
@@ -150,4 +154,14 @@ def create_skull_solver(
 	if b == "kabsch":
 		ref = load_kabsch_reference_body(kabsch_reference_npy) if kabsch_reference_npy is not None else DEFAULT_KABSCH_REFERENCE_BODY.copy()
 		return KabschRealtimeSkullSolver(reference_body=ref)
+	if b == "ceres":
+		from src.ferret_gaze.realtime.ceres_skull_solver import CeresRealtimeSkullSolver
+
+		ref = load_kabsch_reference_body(kabsch_reference_npy) if kabsch_reference_npy is not None else DEFAULT_KABSCH_REFERENCE_BODY.copy()
+		return CeresRealtimeSkullSolver(
+			ref,
+			window_size=ceres_window_size,
+			soft_l1_f_scale=ceres_soft_l1_f_scale,
+			max_nfev=ceres_max_nfev,
+		)
 	raise ValueError(f"Unsupported skull_solver_backend: {backend!r}")

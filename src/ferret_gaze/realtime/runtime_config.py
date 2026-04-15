@@ -77,11 +77,18 @@ class RealtimeRuntimeConfig(BaseModel):
 	)
 
 	# Optional skull pose refinement on the live mocap path (after triangulation, before fuse).
-	skull_solver_backend: Literal["none", "kabsch"] = Field(default="none")
+	skull_solver_backend: Literal["none", "kabsch", "ceres"] = Field(default="none")
 	skull_solver_kabsch_reference_npy: str | None = Field(
 		default=None,
 		description="Path to Nx3 float64 ``.npy`` template; defaults to built-in triangle when unset.",
 	)
+	# Ceres-style sliding SE(3) fit (SciPy); uses the same ``.npy`` template as Kabsch when set.
+	skull_solver_ceres_window_size: int = Field(default=1, ge=1, le=64)
+	skull_solver_ceres_soft_l1_f_scale: float | None = Field(
+		default=None,
+		description="If set (positive), use robust soft_l1 loss with this residual scale (same units as keypoints).",
+	)
+	skull_solver_ceres_max_nfev: int = Field(default=100, ge=1, le=5000)
 
 	# Live mocap gaze fusion: ``stub`` preserves legacy behavior; ``anatomical`` uses skull-local eyes.
 	gaze_fuser_backend: Literal["stub", "anatomical"] = Field(default="stub")

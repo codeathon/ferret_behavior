@@ -4,6 +4,11 @@ Step 4 scaffold: realtime solver benchmark gate with stub adapters.
 This module defines a pluggable realtime skull solver interface and a replay
 benchmark runner so UKF-vs-Ceres decisions can be deferred until real solver
 implementations are ready.
+
+Live mocap additionally supports a nonlinear ``ceres`` backend (SciPy
+``least_squares`` sliding SE(3) fit; see ``ceres_skull_solver``) alongside
+``kabsch``; this module's ``SlidingWindowCeresSkullSolverStub`` remains for
+replay-only latency/geometry comparison against the UKF stub.
 """
 
 from __future__ import annotations
