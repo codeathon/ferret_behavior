@@ -30,6 +30,7 @@ from src.ferret_gaze.realtime.per_frame_compute import (
 	RollingEyeCalibrator,
 	StubGazeFuser,
 	StubRollingEyeCalibrator,
+	apply_inference_to_gaze_packet,
 )
 from src.ferret_gaze.realtime.publisher import RealtimePublisher
 from src.ferret_gaze.realtime.solver_benchmark import RealtimeSkullSolver
@@ -121,13 +122,16 @@ def process_live_mocap_tick(
 	Run infer -> triangulate -> calibrate -> fuse for one bundle (no publish).
 
 	Optional ``skull_solver`` runs after triangulation (e.g. Kabsch orientation from
-	keypoints). The gaze fuser still receives triangulated skull position; rolling
-	calibration runs after the optional skull solver so it sees the final quaternion.
+	keypoints). Inference may supply gaze vectors on :class:`~src.ferret_gaze.realtime.per_frame_compute.FrameInferenceResult`; those are copied onto the packet
+	(via :func:`~src.ferret_gaze.realtime.per_frame_compute.apply_inference_to_gaze_packet`) before triangulation so calibrators and fusers see model-driven directions.
+	The gaze fuser still receives triangulated skull position; rolling calibration
+	runs after the optional skull solver so it sees the final quaternion.
 
 	Used by the grab queue consumer and by :func:`run_live_mocap_compute_publish_session`.
 	"""
 	packet = gaze_packet_from_live_mocap_frame_set(frame_set)
 	inference = inference_runtime.infer(packet, frame_set=frame_set)
+	packet = apply_inference_to_gaze_packet(packet, inference)
 	triangulated = triangulator.triangulate(inference)
 	packet_for_fuse = packet.model_copy(update={"skull_position_xyz": triangulated.skull_position_xyz})
 	if skull_solver is not None:

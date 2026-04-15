@@ -36,6 +36,53 @@ class FrameInferenceResult:
     keypoints_xyz: tuple[tuple[float, float, float], ...] = ()
     # Optional multi-view 2D pixels for one skull proxy landmark: (cam_index, u, v) per view.
     single_landmark_uv_by_cam: tuple[tuple[int, float, float], ...] = ()
+    # Optional world-space gaze (unit vectors after overlay) and eye rest points (mm).
+    left_gaze_direction_xyz: tuple[float, float, float] | None = None
+    right_gaze_direction_xyz: tuple[float, float, float] | None = None
+    left_eye_origin_xyz: tuple[float, float, float] | None = None
+    right_eye_origin_xyz: tuple[float, float, float] | None = None
+
+
+def _unitize_vec3(
+    value: tuple[float, float, float] | None,
+) -> tuple[float, float, float] | None:
+    """Return a unit 3-vector, or ``None`` if missing or numerically zero."""
+    if value is None:
+        return None
+    v = np.asarray(value, dtype=np.float64).reshape(3)
+    n = float(np.linalg.norm(v))
+    if n < 1e-12:
+        return None
+    u = (v / n).astype(np.float64)
+    return (float(u[0]), float(u[1]), float(u[2]))
+
+
+def apply_inference_to_gaze_packet(
+    packet: RealtimeGazePacket,
+    inference: FrameInferenceResult,
+) -> RealtimeGazePacket:
+    """
+    Copy optional gaze / eye-origin fields from inference onto the packet.
+
+    Live mocap and replay scaffold call this immediately after ``infer`` so
+    calibrators and fusers read model-driven directions instead of scaffold-only
+    defaults. Only non-``None`` inference fields are applied; gaze vectors are
+    unit-normalized when their norm is positive.
+    """
+    updates: dict[str, tuple[float, float, float]] = {}
+    lg = _unitize_vec3(inference.left_gaze_direction_xyz)
+    if lg is not None:
+        updates["left_gaze_direction_xyz"] = lg
+    rg = _unitize_vec3(inference.right_gaze_direction_xyz)
+    if rg is not None:
+        updates["right_gaze_direction_xyz"] = rg
+    if inference.left_eye_origin_xyz is not None:
+        updates["left_eye_origin_xyz"] = inference.left_eye_origin_xyz
+    if inference.right_eye_origin_xyz is not None:
+        updates["right_eye_origin_xyz"] = inference.right_eye_origin_xyz
+    if not updates:
+        return packet
+    return packet.model_copy(update=updates)
 
 
 @dataclass(frozen=True)
@@ -136,6 +183,11 @@ class OnnxInferenceRuntime(RealtimeInferenceRuntime):
     This implementation keeps output shape minimal for current scaffolding by
     deriving one confidence value from model outputs. If model execution fails,
     it falls back to deterministic confidence so realtime loops stay alive.
+
+    **Outputs:** ``outputs[0]`` flattened — ``[confidence, optional x,y,z keypoints...]``.
+    Optional ``outputs[1]`` flattened — at least six values
+    ``[lx, ly, lz, rx, ry, rz]`` interpreted as left/right gaze directions in the
+    same world frame as :class:`~src.ferret_gaze.realtime.gaze_packet.RealtimeGazePacket`.
     """
 
     def __init__(self, model_path: Path, provider: str = "CPUExecutionProvider") -> None:
@@ -177,6 +229,8 @@ class OnnxInferenceRuntime(RealtimeInferenceRuntime):
         except ImportError as exc:
             raise ImportError("ONNX backend requires numpy. Install with: uv add numpy") from exc
 
+        left_gaze: tuple[float, float, float] | None = None
+        right_gaze: tuple[float, float, float] | None = None
         try:
             # Features: [seq, capture_s, skull_xyz(3), left_gaze_xyz(3), right_gaze_xyz(3)].
             features = np.array(
@@ -208,15 +262,25 @@ class OnnxInferenceRuntime(RealtimeInferenceRuntime):
                 valid_len = (remaining.size // 3) * 3
                 reshaped = remaining[:valid_len].reshape(-1, 3)
                 keypoints_xyz = tuple((float(x), float(y), float(z)) for x, y, z in reshaped)
+            # Optional second tensor: ``[lx, ly, lz, rx, ry, rz]`` gaze directions (same frame as packet).
+            if len(outputs) >= 2:
+                g2 = np.ravel(np.asarray(outputs[1], dtype=np.float32))
+                if g2.size >= 6:
+                    left_gaze = (float(g2[0]), float(g2[1]), float(g2[2]))
+                    right_gaze = (float(g2[3]), float(g2[4]), float(g2[5]))
         except Exception:
             # Preserve realtime continuity if model/input mismatch occurs.
             confidence = max(0.0, min(1.0, 0.9 + 0.03 * math.sin(packet.seq * 0.05)))
             keypoints_xyz = ()
+            left_gaze = None
+            right_gaze = None
         return FrameInferenceResult(
             seq=packet.seq,
             confidence=confidence,
             keypoints_xyz=keypoints_xyz,
             single_landmark_uv_by_cam=(),
+            left_gaze_direction_xyz=left_gaze,
+            right_gaze_direction_xyz=right_gaze,
         )
 
 
@@ -249,6 +313,12 @@ class OnnxImagesInferenceRuntime(RealtimeInferenceRuntime):
     ``output_uv_normalized``); optional third value is a per-view confidence in
     ``[0, 1]``. Coordinates are scaled to the **original** image size before
     returning in ``single_landmark_uv_by_cam``.
+
+    **Extended head (optional):** if the flattened output has **at least nine**
+    values ``[u, v, c_or_pad, lx, ly, lz, rx, ry, rz]``, values ``3:9`` are read
+    as left/right gaze directions (world frame, same as the gaze packet) from
+    the **first** camera (lowest index) that provides them; ``c_or_pad`` is still
+    treated as per-view confidence when it lies in ``[0, 1]``.
     """
 
     def __init__(
@@ -314,10 +384,14 @@ class OnnxImagesInferenceRuntime(RealtimeInferenceRuntime):
                 seq=packet.seq,
                 confidence=self._fallback_confidence(packet.seq),
                 single_landmark_uv_by_cam=(),
+                left_gaze_direction_xyz=None,
+                right_gaze_direction_xyz=None,
             )
 
         per_view_conf: list[float] = []
         uv_rows: list[tuple[int, float, float]] = []
+        left_gaze: tuple[float, float, float] | None = None
+        right_gaze: tuple[float, float, float] | None = None
 
         for cam_id in sorted(frame_set.images_bgr.keys()):
             image_bgr = frame_set.images_bgr[cam_id]
@@ -346,7 +420,12 @@ class OnnxImagesInferenceRuntime(RealtimeInferenceRuntime):
                 )
                 uv_rows.append((cam_id, u_o, v_o))
                 if flat.size >= 3:
-                    per_view_conf.append(max(0.0, min(1.0, float(flat[2]))))
+                    c2 = float(flat[2])
+                    if 0.0 <= c2 <= 1.0:
+                        per_view_conf.append(max(0.0, min(1.0, c2)))
+                if flat.size >= 9 and left_gaze is None:
+                    left_gaze = (float(flat[3]), float(flat[4]), float(flat[5]))
+                    right_gaze = (float(flat[6]), float(flat[7]), float(flat[8]))
             except Exception:
                 continue
 
@@ -355,6 +434,8 @@ class OnnxImagesInferenceRuntime(RealtimeInferenceRuntime):
                 seq=packet.seq,
                 confidence=self._fallback_confidence(packet.seq),
                 single_landmark_uv_by_cam=(),
+                left_gaze_direction_xyz=left_gaze,
+                right_gaze_direction_xyz=right_gaze,
             )
 
         confidence = (
@@ -366,6 +447,8 @@ class OnnxImagesInferenceRuntime(RealtimeInferenceRuntime):
             seq=packet.seq,
             confidence=confidence,
             single_landmark_uv_by_cam=tuple(uv_rows),
+            left_gaze_direction_xyz=left_gaze,
+            right_gaze_direction_xyz=right_gaze,
         )
 
 
@@ -534,6 +617,7 @@ def run_realtime_compute_scaffold(
         if frame_sets is not None and i < len(frame_sets):
             fs = frame_sets[i]
         inference = inference_runtime.infer(packet, frame_set=fs)
+        packet = apply_inference_to_gaze_packet(packet, inference)
         triangulated = triangulator.triangulate(inference)
         packet_for_calib = packet.model_copy(update={"skull_position_xyz": triangulated.skull_position_xyz})
         calibration = calibrator.update(
