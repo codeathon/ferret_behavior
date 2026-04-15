@@ -52,6 +52,9 @@ class RollingCalibrationState:
 
     gain: float
     offset: float
+    # Optional per-eye yaw biases (rad) applied in skull +Y rotation by anatomical fuse.
+    left_yaw_bias_rad: float = 0.0
+    right_yaw_bias_rad: float = 0.0
 
 
 class RealtimeInferenceRuntime(ABC):
@@ -84,8 +87,19 @@ class RollingEyeCalibrator(ABC):
     """Interface for rolling eye-calibration backends."""
 
     @abstractmethod
-    def update(self, triangulated: TriangulationResult) -> RollingCalibrationState:
-        """Update calibrator state with one triangulation sample."""
+    def update(
+        self,
+        triangulated: TriangulationResult,
+        *,
+        inference: FrameInferenceResult | None = None,
+        packet: RealtimeGazePacket | None = None,
+    ) -> RollingCalibrationState:
+        """
+        Update calibrator state with one triangulation sample.
+
+        ``inference`` and ``packet`` are optional for legacy callers; anatomical
+        calibrators use them for binocular cues after the skull pose is fixed.
+        """
 
 
 class RealtimeGazeFuser(ABC):
@@ -455,7 +469,14 @@ class StubRollingEyeCalibrator(RollingEyeCalibrator):
         self._gain = 1.0
         self._offset = 0.0
 
-    def update(self, triangulated: TriangulationResult) -> RollingCalibrationState:
+    def update(
+        self,
+        triangulated: TriangulationResult,
+        *,
+        inference: FrameInferenceResult | None = None,
+        packet: RealtimeGazePacket | None = None,
+    ) -> RollingCalibrationState:
+        _ = inference, packet
         self._gain = (0.995 * self._gain) + (0.005 * (1.0 + abs(triangulated.skull_position_xyz[0])))
         self._offset = (0.99 * self._offset) + (0.01 * triangulated.skull_position_xyz[2])
         return RollingCalibrationState(gain=self._gain, offset=self._offset)
@@ -514,8 +535,13 @@ def run_realtime_compute_scaffold(
             fs = frame_sets[i]
         inference = inference_runtime.infer(packet, frame_set=fs)
         triangulated = triangulator.triangulate(inference)
-        calibration = calibrator.update(triangulated)
-        fused_packet = fuser.fuse(packet, triangulated, calibration, inference)
+        packet_for_calib = packet.model_copy(update={"skull_position_xyz": triangulated.skull_position_xyz})
+        calibration = calibrator.update(
+            triangulated,
+            inference=inference,
+            packet=packet_for_calib,
+        )
+        fused_packet = fuser.fuse(packet_for_calib, triangulated, calibration, inference)
         fused.append(fused_packet)
     return fused
 

@@ -42,6 +42,12 @@ from src.ferret_gaze.realtime.publisher import (
     ZmqRealtimePublisher,
     create_realtime_publisher,
 )
+from src.ferret_gaze.realtime.anatomical_mocap_fuse import (
+    AnatomicalMocapGazeFuser,
+    AnatomicalRollingEyeCalibrator,
+    create_eye_calibrator,
+    create_gaze_fuser,
+)
 from src.ferret_gaze.realtime.grab_live_wiring import LiveMocapGrabPublishWire
 from src.ferret_gaze.realtime.kabsch_skull_solver import (
     DEFAULT_KABSCH_REFERENCE_BODY,
@@ -123,6 +129,10 @@ __all__ = [
     "kabsch_rotation_translation",
     "KabschRealtimeSkullSolver",
     "create_skull_solver",
+    "AnatomicalMocapGazeFuser",
+    "AnatomicalRollingEyeCalibrator",
+    "create_eye_calibrator",
+    "create_gaze_fuser",
     "RealtimeRuntimeConfig",
     "load_realtime_runtime_config",
     "RealtimeSkullSolver",

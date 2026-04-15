@@ -20,5 +20,11 @@
   "calibration_toml_path": null,
   "acceptance_max_p95_ms": 80.0,
   "skull_solver_backend": "none",
-  "skull_solver_kabsch_reference_npy": null
+  "skull_solver_kabsch_reference_npy": null,
+  "gaze_fuser_backend": "stub",
+  "eye_calibrator_backend": "stub",
+  "anatomical_half_ipd_mm": 10.0,
+  "anatomical_eye_y_mm": 25.0,
+  "anatomical_eye_z_mm": 0.0,
+  "anatomical_vergence_ema_alpha": 0.08
 }

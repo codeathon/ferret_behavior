@@ -28,6 +28,7 @@ from src.ferret_gaze.realtime import (
     run_realtime_compute_scaffold,
     run_realtime_transport_scaffold,
 )
+from src.ferret_gaze.realtime.anatomical_mocap_fuse import create_eye_calibrator, create_gaze_fuser
 from src.ferret_gaze.realtime.kabsch_skull_solver import create_skull_solver
 from src.ferret_gaze.realtime.live_mocap_grab_session import run_live_mocap_grab_n_frames_publish
 from src.ferret_gaze.realtime.live_mocap_pipeline import (
@@ -372,6 +373,16 @@ def _run_realtime_pipeline(
         if runtime_config.skull_solver_kabsch_reference_npy
         else None,
     )
+    eye_calibrator = create_eye_calibrator(
+        runtime_config.eye_calibrator_backend,
+        vergence_ema_alpha=runtime_config.anatomical_vergence_ema_alpha,
+    )
+    gaze_fuser = create_gaze_fuser(
+        runtime_config.gaze_fuser_backend,
+        half_ipd_mm=runtime_config.anatomical_half_ipd_mm,
+        eye_y_mm=runtime_config.anatomical_eye_y_mm,
+        eye_z_mm=runtime_config.anatomical_eye_z_mm,
+    )
 
     # Step 4 benchmark gate scaffold: compare stub solvers on a shared replay stream.
     replay_packets = build_synthetic_replay_packets(n_packets=runtime_config.benchmark_packets)
@@ -417,6 +428,8 @@ def _run_realtime_pipeline(
                     triangulator=triangulator,
                     hz=runtime_config.transport_hz,
                     stale_threshold_ms=runtime_config.stale_threshold_ms,
+                    calibrator=eye_calibrator,
+                    fuser=gaze_fuser,
                     skull_solver=skull_solver,
                 )
                 session_closed_publisher = True
@@ -451,6 +464,8 @@ def _run_realtime_pipeline(
                     stale_threshold_ms=runtime_config.stale_threshold_ms,
                     wire_queue_size=runtime_config.live_mocap_grab_wire_queue_size,
                     pace_hz=runtime_config.live_mocap_grab_pace_hz,
+                    calibrator=eye_calibrator,
+                    fuser=gaze_fuser,
                     skull_solver=skull_solver,
                 )
             else:

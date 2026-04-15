@@ -15,8 +15,10 @@ from src.cameras.multicamera_recording import MultiCameraRecording
 from src.ferret_gaze.realtime.grab_live_wiring import LiveMocapGrabPublishWire
 from src.ferret_gaze.realtime.latency_metrics import LatencySummary
 from src.ferret_gaze.realtime.per_frame_compute import (
+	RealtimeGazeFuser,
 	RealtimeInferenceRuntime,
 	RealtimeTriangulator,
+	RollingEyeCalibrator,
 )
 from src.ferret_gaze.realtime.publisher import RealtimePublisher
 from src.ferret_gaze.realtime.solver_benchmark import RealtimeSkullSolver
@@ -41,12 +43,15 @@ def run_live_mocap_grab_n_frames_publish(
 	pace_hz: float | None = None,
 	camera_exposure_overrides: dict[str, tuple[int, float]] | None = None,
 	skull_solver: RealtimeSkullSolver | None = None,
+	calibrator: RollingEyeCalibrator | None = None,
+	fuser: RealtimeGazeFuser | None = None,
 ) -> LatencySummary | None:
 	"""
 	Open cameras, start the live publish consumer, grab ``n_frames`` synchronized sets, then stop.
 
 	Does **not** close ``publisher``; the caller should do that after this returns.
 	``n_frames`` must be positive.
+	Optional ``calibrator`` / ``fuser`` override the stub defaults (see ``create_*`` factories).
 	"""
 	if n_frames < 1:
 		raise ValueError("n_frames must be at least 1")
@@ -75,6 +80,8 @@ def run_live_mocap_grab_n_frames_publish(
 			stale_threshold_ms=stale_threshold_ms,
 			pace_hz=pace_hz,
 			skull_solver=skull_solver,
+			calibrator=calibrator,
+			fuser=fuser,
 		)
 		try:
 			logger.info(

@@ -121,14 +121,14 @@ def process_live_mocap_tick(
 	Run infer -> triangulate -> calibrate -> fuse for one bundle (no publish).
 
 	Optional ``skull_solver`` runs after triangulation (e.g. Kabsch orientation from
-	keypoints) while :class:`StubGazeFuser` still supplies skull position from triangulation.
+	keypoints). The gaze fuser still receives triangulated skull position; rolling
+	calibration runs after the optional skull solver so it sees the final quaternion.
 
 	Used by the grab queue consumer and by :func:`run_live_mocap_compute_publish_session`.
 	"""
 	packet = gaze_packet_from_live_mocap_frame_set(frame_set)
 	inference = inference_runtime.infer(packet, frame_set=frame_set)
 	triangulated = triangulator.triangulate(inference)
-	calibration = calibrator.update(triangulated)
 	packet_for_fuse = packet.model_copy(update={"skull_position_xyz": triangulated.skull_position_xyz})
 	if skull_solver is not None:
 		packet_for_fuse = skull_solver.solve_with_context(
@@ -136,6 +136,11 @@ def process_live_mocap_tick(
 			inference=inference,
 			triangulated=triangulated,
 		)
+	calibration = calibrator.update(
+		triangulated,
+		inference=inference,
+		packet=packet_for_fuse,
+	)
 	return fuser.fuse(packet_for_fuse, triangulated, calibration, inference)
 
 

@@ -83,6 +83,16 @@ class RealtimeRuntimeConfig(BaseModel):
 		description="Path to Nx3 float64 ``.npy`` template; defaults to built-in triangle when unset.",
 	)
 
+	# Live mocap gaze fusion: ``stub`` preserves legacy behavior; ``anatomical`` uses skull-local eyes.
+	gaze_fuser_backend: Literal["stub", "anatomical"] = Field(default="stub")
+	eye_calibrator_backend: Literal["stub", "anatomical"] = Field(default="stub")
+	# Anatomical geometry (skull-local mm, symmetric about mid-sagittal +X right).
+	anatomical_half_ipd_mm: float = Field(default=10.0, gt=0.0)
+	anatomical_eye_y_mm: float = Field(default=25.0)
+	anatomical_eye_z_mm: float = Field(default=0.0)
+	# EMA step for binocular yaw-difference correction (anatomical calibrator only).
+	anatomical_vergence_ema_alpha: float = Field(default=0.08, gt=0.0, le=1.0)
+
 
 def load_realtime_runtime_config(config_path: Path | None = None) -> RealtimeRuntimeConfig:
 	"""
