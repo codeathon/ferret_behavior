@@ -110,6 +110,7 @@ For live hardware, first set these fields in `configs/realtime.runtime.live.json
 - `inference_model_path` → absolute path to your ONNX model
 - `calibration_toml_path` → absolute path to session `*camera_calibration.toml`
 - optional: `live_mocap_grab_output_path` if you do not want output under the recording path
+- optional: `live_mocap_pupil_association_enabled` (and related `live_mocap_pupil_*` keys) to attach Pupil eye frames in the same realtime grab path as Basler (`full_pipeline` wires `LiveMocapPupilRealtimeContext` + latch callback)
 
 Then run:
 ```bash

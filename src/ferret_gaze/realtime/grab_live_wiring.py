@@ -13,6 +13,7 @@ import threading
 import time
 from typing import Literal
 
+from src.cameras.synchronization.pupil_dual_eye_rings import PupilAssociationMetrics, PupilDualEyeRings
 from src.cameras.synchronization.realtime_sync import BaslerFrameSet
 from src.ferret_gaze.realtime.latency_metrics import (
 	LatencySummary,
@@ -61,7 +62,13 @@ class LiveMocapGrabPublishWire:
 	The combiner thread calls ``wire(basler_frameset)``; keep work minimal (queue only).
 	"""
 
-	def __init__(self, max_queue_size: int = 32) -> None:
+	def __init__(
+		self,
+		max_queue_size: int = 32,
+		*,
+		pupil_rings: PupilDualEyeRings | None = None,
+		pupil_stale_max_delta_ns: int | None = None,
+	) -> None:
 		if max_queue_size < 1:
 			raise ValueError("max_queue_size must be at least 1")
 		self._q: queue.Queue[LiveMocapFrameSet | object] = queue.Queue(maxsize=max_queue_size)
@@ -72,6 +79,9 @@ class LiveMocapGrabPublishWire:
 		self._put_timeout_s = 0.005
 		self._queue_overflow_count = 0
 		self._counter_lock = threading.Lock()
+		# Optional live Pupil association (nearest wall-UTC frame per Basler anchor).
+		self._pupil_rings = pupil_rings
+		self._pupil_stale_max_delta_ns = pupil_stale_max_delta_ns
 
 	def configure_overflow_policy(
 		self,
@@ -93,9 +103,20 @@ class LiveMocapGrabPublishWire:
 		with self._counter_lock:
 			return self._queue_overflow_count
 
+	def pupil_association_metrics(self) -> PupilAssociationMetrics | None:
+		"""Return live Pupil/Basler association counters, or None if Pupil rings are disabled."""
+		if self._pupil_rings is None:
+			return None
+		return self._pupil_rings.metrics
+
 	def __call__(self, basler: BaslerFrameSet) -> None:
 		"""Enqueue one live bundle using the configured overflow policy."""
-		live = basler_frameset_to_live_mocap_frame_set(basler, self._seq)
+		live = basler_frameset_to_live_mocap_frame_set(
+			basler,
+			self._seq,
+			pupil_rings=self._pupil_rings,
+			pupil_stale_max_delta_ns=self._pupil_stale_max_delta_ns,
+		)
 		self._seq += 1
 		if live is None:
 			return

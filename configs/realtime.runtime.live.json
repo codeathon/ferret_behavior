@@ -43,5 +43,11 @@
   "anatomical_half_ipd_mm": 10.0,
   "anatomical_eye_y_mm": 25.0,
   "anatomical_eye_z_mm": 0.0,
-  "anatomical_vergence_ema_alpha": 0.08
+  "anatomical_vergence_ema_alpha": 0.08,
+  "live_mocap_pupil_association_enabled": false,
+  "live_mocap_pupil_stale_max_delta_ms": null,
+  "live_mocap_pupil_ring_maxlen": 512,
+  "live_mocap_pupil_clock_sync_endpoint": null,
+  "live_mocap_pupil_queue_ingest_enabled": false,
+  "live_mocap_pupil_synthetic_dummy_eyes": false
 }

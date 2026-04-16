@@ -29,6 +29,7 @@ from src.cameras.camera_config import (
     NO_BINNING_SERIALS,
     get_image_shape,
 )
+from src.cameras.diagnostics.timestamp_mapping import TimestampMapping
 from src.cameras.grab_loops import GrabLoopRunner
 from src.cameras.synchronization.realtime_sync import BaslerFrameSet
 from src.cameras.video_writers import VideoWriterManager
@@ -262,6 +263,7 @@ class MultiCameraRecording:
     def _get_grabber(
         self,
         frameset_sink: Callable[[BaslerFrameSet], None] | None = None,
+        on_timestamp_latch: Callable[[TimestampMapping], None] | None = None,
     ) -> GrabLoopRunner:
         if self._writer is None:
             raise RuntimeError("Call create_video_writers_ffmpeg() before grabbing.")
@@ -272,31 +274,40 @@ class MultiCameraRecording:
             writer=self._writer,
             output_path=self.output_path,
             frameset_sink=frameset_sink,
+            on_timestamp_latch=on_timestamp_latch,
         )
 
     def grab_n_frames(
         self,
         number_of_frames: int,
         frameset_sink: Callable[[BaslerFrameSet], None] | None = None,
+        on_timestamp_latch: Callable[[TimestampMapping], None] | None = None,
     ) -> None:
         """Grab frames; optional ``frameset_sink`` receives each emitted ``BaslerFrameSet`` (BGR payloads when set)."""
-        self._get_grabber(frameset_sink=frameset_sink).grab_n_frames(number_of_frames)
+        self._get_grabber(frameset_sink=frameset_sink, on_timestamp_latch=on_timestamp_latch).grab_n_frames(
+            number_of_frames
+        )
 
     def grab_n_seconds(
         self,
         number_of_seconds: float,
         frameset_sink: Callable[[BaslerFrameSet], None] | None = None,
+        on_timestamp_latch: Callable[[TimestampMapping], None] | None = None,
     ) -> None:
-        self._get_grabber(frameset_sink=frameset_sink).grab_n_seconds(number_of_seconds)
+        self._get_grabber(frameset_sink=frameset_sink, on_timestamp_latch=on_timestamp_latch).grab_n_seconds(
+            number_of_seconds
+        )
 
     def grab_until_input(
         self,
         frameset_sink: Callable[[BaslerFrameSet], None] | None = None,
+        on_timestamp_latch: Callable[[TimestampMapping], None] | None = None,
     ) -> None:
-        self._get_grabber(frameset_sink=frameset_sink).grab_until_input()
+        self._get_grabber(frameset_sink=frameset_sink, on_timestamp_latch=on_timestamp_latch).grab_until_input()
 
     def pylon_internal_statistics(
         self,
         frameset_sink: Callable[[BaslerFrameSet], None] | None = None,
+        on_timestamp_latch: Callable[[TimestampMapping], None] | None = None,
     ) -> bool:
-        return self._get_grabber(frameset_sink=frameset_sink).pylon_internal_statistics()
+        return self._get_grabber(frameset_sink=frameset_sink, on_timestamp_latch=on_timestamp_latch).pylon_internal_statistics()

@@ -58,6 +58,7 @@ from src.ferret_gaze.realtime.kabsch_skull_solver import (
 )
 from src.ferret_gaze.realtime.ceres_skull_solver import CeresRealtimeSkullSolver
 from src.ferret_gaze.realtime.live_mocap_grab_session import run_live_mocap_grab_n_frames_publish
+from src.ferret_gaze.realtime.live_pupil_realtime import LiveMocapPupilRealtimeContext
 from src.ferret_gaze.realtime.live_mocap_pipeline import (
     basler_frameset_to_live_mocap_frame_set,
     build_synthetic_live_mocap_frame_sets,
@@ -128,6 +129,7 @@ __all__ = [
     "process_live_mocap_tick",
     "LiveMocapGrabPublishWire",
     "run_live_mocap_grab_n_frames_publish",
+    "LiveMocapPupilRealtimeContext",
     "DEFAULT_KABSCH_REFERENCE_BODY",
     "kabsch_rotation_translation",
     "KabschRealtimeSkullSolver",

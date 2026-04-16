@@ -7,6 +7,7 @@ import time
 import numpy as np
 import pytest
 
+from src.cameras.synchronization.pupil_dual_eye_rings import PupilDualEyeRings
 from src.cameras.synchronization.realtime_sync import BaslerFrame, BaslerFrameSet
 from src.ferret_gaze.realtime.grab_live_wiring import LiveMocapGrabPublishWire
 from src.ferret_gaze.realtime.per_frame_compute import StubInferenceRuntime, StubTriangulator
@@ -253,3 +254,11 @@ def test_grab_wire_records_publish_errors() -> None:
 	assert summary is not None
 	assert summary.packet_count == 0
 	assert summary.publish_error_count == 1
+
+
+def test_grab_wire_pupil_association_metrics_optional() -> None:
+	rings = PupilDualEyeRings(maxlen_per_eye=16)
+	wire = LiveMocapGrabPublishWire(max_queue_size=8, pupil_rings=rings)
+	assert wire.pupil_association_metrics() is rings.metrics
+	wire_plain = LiveMocapGrabPublishWire(max_queue_size=8)
+	assert wire_plain.pupil_association_metrics() is None

@@ -27,3 +27,13 @@ class LiveMocapFrameSet:
 
     camera_serial_by_index: Mapping[int, str] = field(default_factory=dict)
     """Optional Basler serial (or label) per camera index for diagnostics."""
+
+    # Optional Pupil eye payloads when live association is enabled (nearest-neighbor to anchor).
+    eye0_bgr: np.ndarray | None = None
+    eye1_bgr: np.ndarray | None = None
+    pupil_eye0_utc_ns: int | None = None
+    pupil_eye1_utc_ns: int | None = None
+    pupil_eye0_delta_ns: int | None = None
+    pupil_eye1_delta_ns: int | None = None
+    pupil_eye0_stale: bool = False
+    pupil_eye1_stale: bool = False

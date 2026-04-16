@@ -31,6 +31,7 @@ from src.ferret_gaze.realtime import (
 from src.ferret_gaze.realtime.anatomical_mocap_fuse import create_eye_calibrator, create_gaze_fuser
 from src.ferret_gaze.realtime.kabsch_skull_solver import create_skull_solver
 from src.ferret_gaze.realtime.live_mocap_grab_session import run_live_mocap_grab_n_frames_publish
+from src.ferret_gaze.realtime.live_pupil_realtime import LiveMocapPupilRealtimeContext
 from src.ferret_gaze.realtime.live_mocap_pipeline import (
     build_synthetic_live_mocap_frame_sets,
     run_live_mocap_compute_publish_session,
@@ -423,6 +424,10 @@ def _run_realtime_pipeline(
                     n_cams=runtime_config.live_mocap_synthetic_camera_count,
                     height=runtime_config.live_mocap_synthetic_height,
                     width=runtime_config.live_mocap_synthetic_width,
+                    attach_dummy_pupil_eyes=(
+                        runtime_config.live_mocap_pupil_association_enabled
+                        and runtime_config.live_mocap_pupil_synthetic_dummy_eyes
+                    ),
                 )
                 run_live_mocap_compute_publish_session(
                     frame_sets=frame_sets,
@@ -454,25 +459,50 @@ def _run_realtime_pipeline(
                     n_frames,
                     grab_fps,
                 )
-                run_live_mocap_grab_n_frames_publish(
-                    output_path=grab_out,
-                    nir_only=runtime_config.live_mocap_grab_nir_only,
-                    fps=float(grab_fps),
-                    binning_factor=runtime_config.live_mocap_grab_binning_factor,
-                    hardware_triggering=runtime_config.live_mocap_grab_hardware_trigger,
-                    n_frames=int(n_frames),
-                    publisher=publisher,
-                    inference_runtime=inference_runtime,
-                    triangulator=triangulator,
-                    stale_threshold_ms=runtime_config.stale_threshold_ms,
-                    wire_queue_size=runtime_config.live_mocap_grab_wire_queue_size,
-                    wire_overflow_policy=runtime_config.live_mocap_grab_wire_overflow_policy,
-                    wire_put_timeout_ms=runtime_config.live_mocap_grab_wire_put_timeout_ms,
-                    pace_hz=runtime_config.live_mocap_grab_pace_hz,
-                    calibrator=eye_calibrator,
-                    fuser=gaze_fuser,
-                    skull_solver=skull_solver,
-                )
+                pupil_ctx: LiveMocapPupilRealtimeContext | None = None
+                try:
+                    pupil_rings_kw = None
+                    pupil_stale_ns_kw = None
+                    on_latch_kw = None
+                    if runtime_config.live_mocap_pupil_association_enabled:
+                        pupil_ctx = LiveMocapPupilRealtimeContext(
+                            ring_maxlen=runtime_config.live_mocap_pupil_ring_maxlen,
+                            clock_sync_endpoint=runtime_config.live_mocap_pupil_clock_sync_endpoint,
+                            start_queue_thread=runtime_config.live_mocap_pupil_queue_ingest_enabled,
+                        )
+                        pupil_rings_kw = pupil_ctx.rings
+                        on_latch_kw = pupil_ctx.on_grab_latch
+                        stale_ms = (
+                            runtime_config.live_mocap_pupil_stale_max_delta_ms
+                            if runtime_config.live_mocap_pupil_stale_max_delta_ms is not None
+                            else runtime_config.stale_threshold_ms
+                        )
+                        pupil_stale_ns_kw = int(float(stale_ms) * 1_000_000)
+                    run_live_mocap_grab_n_frames_publish(
+                        output_path=grab_out,
+                        nir_only=runtime_config.live_mocap_grab_nir_only,
+                        fps=float(grab_fps),
+                        binning_factor=runtime_config.live_mocap_grab_binning_factor,
+                        hardware_triggering=runtime_config.live_mocap_grab_hardware_trigger,
+                        n_frames=int(n_frames),
+                        publisher=publisher,
+                        inference_runtime=inference_runtime,
+                        triangulator=triangulator,
+                        stale_threshold_ms=runtime_config.stale_threshold_ms,
+                        wire_queue_size=runtime_config.live_mocap_grab_wire_queue_size,
+                        wire_overflow_policy=runtime_config.live_mocap_grab_wire_overflow_policy,
+                        wire_put_timeout_ms=runtime_config.live_mocap_grab_wire_put_timeout_ms,
+                        pace_hz=runtime_config.live_mocap_grab_pace_hz,
+                        calibrator=eye_calibrator,
+                        fuser=gaze_fuser,
+                        skull_solver=skull_solver,
+                        pupil_rings=pupil_rings_kw,
+                        pupil_stale_max_delta_ns=pupil_stale_ns_kw,
+                        on_timestamp_latch=on_latch_kw,
+                    )
+                finally:
+                    if pupil_ctx is not None:
+                        pupil_ctx.shutdown()
             else:
                 raise ValueError(
                     f"Unsupported live_mocap_frame_source: {runtime_config.live_mocap_frame_source!r}"

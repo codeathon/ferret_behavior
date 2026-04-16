@@ -12,9 +12,11 @@ from __future__ import annotations
 import math
 import time
 from collections.abc import Sequence
+from dataclasses import replace
 
 import numpy as np
 
+from src.cameras.synchronization.pupil_dual_eye_rings import PupilDualEyeRings
 from src.cameras.synchronization.realtime_sync import BaslerFrameSet
 from src.ferret_gaze.realtime.gaze_packet import RealtimeGazePacket
 from src.ferret_gaze.realtime.latency_metrics import (
@@ -58,12 +60,21 @@ def gaze_packet_from_live_mocap_frame_set(frame_set: LiveMocapFrameSet) -> Realt
 	)
 
 
-def basler_frameset_to_live_mocap_frame_set(basler: BaslerFrameSet, seq: int) -> LiveMocapFrameSet | None:
+def basler_frameset_to_live_mocap_frame_set(
+	basler: BaslerFrameSet,
+	seq: int,
+	*,
+	pupil_rings: PupilDualEyeRings | None = None,
+	pupil_stale_max_delta_ns: int | None = None,
+) -> LiveMocapFrameSet | None:
 	"""
 	Map a combiner :class:`BaslerFrameSet` to :class:`LiveMocapFrameSet`.
 
 	Skips cameras whose ``payload`` is missing or not ``HxWx3`` uint8 BGR.
 	Returns ``None`` if no valid images were collected.
+
+	When ``pupil_rings`` is set, nearest wall-UTC-matched Pupil eye frames are attached
+	(stale flags if buffer empty or delta exceeds ``pupil_stale_max_delta_ns``; default 80 ms).
 	"""
 	images_bgr: dict[int, np.ndarray] = {}
 	for cam_id, frame in sorted(basler.frames_by_camera.items()):
@@ -74,10 +85,25 @@ def basler_frameset_to_live_mocap_frame_set(basler: BaslerFrameSet, seq: int) ->
 			images_bgr[cam_id] = payload
 	if not images_bgr:
 		return None
-	return LiveMocapFrameSet(
+	live = LiveMocapFrameSet(
 		seq=seq,
 		anchor_utc_ns=basler.anchor_utc_ns,
 		images_bgr=images_bgr,
+	)
+	if pupil_rings is None:
+		return live
+	stale_ns = pupil_stale_max_delta_ns if pupil_stale_max_delta_ns is not None else 80_000_000
+	a0, a1 = pupil_rings.associate(basler.anchor_utc_ns, stale_ns)
+	return replace(
+		live,
+		eye0_bgr=a0.image,
+		eye1_bgr=a1.image,
+		pupil_eye0_utc_ns=a0.chosen_utc_ns,
+		pupil_eye1_utc_ns=a1.chosen_utc_ns,
+		pupil_eye0_delta_ns=a0.delta_ns,
+		pupil_eye1_delta_ns=a1.delta_ns,
+		pupil_eye0_stale=a0.stale,
+		pupil_eye1_stale=a1.stale,
 	)
 
 
@@ -89,6 +115,7 @@ def build_synthetic_live_mocap_frame_sets(
 	width: int = 64,
 	anchor_step_ns: int = 1_000_000,
 	anchor_base_ns: int | None = None,
+	attach_dummy_pupil_eyes: bool = False,
 ) -> list[LiveMocapFrameSet]:
 	"""Produce trivial BGR bundles for dry-runs without cameras (tests / bench)."""
 	if n_packets <= 0:
@@ -99,13 +126,24 @@ def build_synthetic_live_mocap_frame_sets(
 	out: list[LiveMocapFrameSet] = []
 	for seq in range(n_packets):
 		images = {i: np.zeros((height, width, 3), dtype=np.uint8) for i in range(n_cams)}
-		out.append(
-			LiveMocapFrameSet(
-				seq=seq,
-				anchor_utc_ns=base + seq * anchor_step_ns,
-				images_bgr=images,
+		anchor = base + seq * anchor_step_ns
+		fs = LiveMocapFrameSet(seq=seq, anchor_utc_ns=anchor, images_bgr=images)
+		if attach_dummy_pupil_eyes:
+			# Tiny placeholders so the realtime path carries eye payloads like grab+Pupil rings.
+			e0 = np.zeros((4, 4, 3), dtype=np.uint8)
+			e1 = np.ones((4, 4, 3), dtype=np.uint8) * 40
+			fs = replace(
+				fs,
+				eye0_bgr=e0,
+				eye1_bgr=e1,
+				pupil_eye0_utc_ns=anchor,
+				pupil_eye1_utc_ns=anchor + 1,
+				pupil_eye0_delta_ns=0,
+				pupil_eye1_delta_ns=1,
+				pupil_eye0_stale=False,
+				pupil_eye1_stale=False,
 			)
-		)
+		out.append(fs)
 	return out
 
 

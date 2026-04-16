@@ -89,6 +89,29 @@ class RealtimeRuntimeConfig(BaseModel):
 		description="Optional max publish rate for the consumer thread (None = no extra pacing).",
 	)
 
+	# --- live_mocap + Pupil (grab or synthetic): combined frame-set path ---
+	live_mocap_pupil_association_enabled: bool = Field(
+		default=False,
+		description="When True, grab path attaches nearest Pupil eyes per Basler anchor; synthetic can add dummy eyes.",
+	)
+	live_mocap_pupil_stale_max_delta_ms: float | None = Field(
+		default=None,
+		description="Max |Δt| for Pupil match vs Basler anchor (ms); defaults to stale_threshold_ms when None.",
+	)
+	live_mocap_pupil_ring_maxlen: int = Field(default=512, ge=16, le=8192)
+	live_mocap_pupil_clock_sync_endpoint: str | None = Field(
+		default=None,
+		description="Pupil Remote ZMQ endpoint for clock samples at Basler latch (e.g. tcp://127.0.0.1:50020).",
+	)
+	live_mocap_pupil_queue_ingest_enabled: bool = Field(
+		default=False,
+		description="When association enabled, start wall-UTC queue ingest thread (producer pushes tuples).",
+	)
+	live_mocap_pupil_synthetic_dummy_eyes: bool = Field(
+		default=False,
+		description="Synthetic live_mocap only: attach tiny dummy eye BGR images when association_enabled.",
+	)
+
 	# Optional skull pose refinement on the live mocap path (after triangulation, before fuse).
 	skull_solver_backend: Literal["none", "kabsch", "ceres"] = Field(default="none")
 	skull_solver_kabsch_reference_npy: str | None = Field(

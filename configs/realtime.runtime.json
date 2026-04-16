@@ -35,5 +35,11 @@
   "anatomical_eye_z_mm": 0.0,
   "anatomical_vergence_ema_alpha": 0.08,
   "live_mocap_grab_wire_overflow_policy": "drop_oldest",
-  "live_mocap_grab_wire_put_timeout_ms": 5
+  "live_mocap_grab_wire_put_timeout_ms": 5,
+  "live_mocap_pupil_association_enabled": false,
+  "live_mocap_pupil_stale_max_delta_ms": null,
+  "live_mocap_pupil_ring_maxlen": 512,
+  "live_mocap_pupil_clock_sync_endpoint": null,
+  "live_mocap_pupil_queue_ingest_enabled": false,
+  "live_mocap_pupil_synthetic_dummy_eyes": false
 }

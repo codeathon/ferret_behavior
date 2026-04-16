@@ -15,7 +15,7 @@ After the `camera_restructure` refactor, the acquisition code is split across fo
 | `timestamp_utils.py` | `latch_timestamp_mapping()`, `trim_timestamp_zeros()`, `save_timestamps()`. |
 | `grab_loops.py` | `GrabLoopRunner` — frame retrieval loop and grab modes; optional `frameset_sink` for live frame-sets (BGR payloads); combiner uses host-anchored `capture_utc_ns`. |
 | `postprocess.py` | Post-recording sync, file moves, and `combine_videos` call. |
-| `synchronization/` | Timestamp synchronization across Basler and Pupil streams. |
+| `synchronization/` | Timestamp synchronization across Basler and Pupil streams; optional live `PupilDualEyeRings` + `WallUtcFromPupilTime` for combined frame-sets. |
 | `intrinsics/` | Per-camera lens calibration and distortion correction. |
 | `diagnostics/` | Timestamp plotting and file exploration tools. |
 
@@ -61,6 +61,14 @@ After the `camera_restructure` refactor, the acquisition code is split across fo
 6. Recordings are saved to `/home/scholl-lab/pupil_recordings`.
 
 ---
+
+## Live combined Basler + Pupil (optional)
+
+For realtime grab, you can attach nearest-neighbor Pupil eye frames to each emitted `BaslerFrameSet` before gaze inference:
+
+- **`run_pipeline` / JSON:** set `live_mocap_pupil_association_enabled` (and optional `live_mocap_pupil_clock_sync_endpoint`, `live_mocap_pupil_queue_ingest_enabled`, etc.) in your realtime runtime config — `full_pipeline` builds `LiveMocapPupilRealtimeContext`, passes `pupil_rings` into `LiveMocapGrabPublishWire`, and registers `on_timestamp_latch` on `GrabLoopRunner` so Pupil clock sync uses the **same** latch as Basler `capture_utc_ns`.
+- **Manual / tests:** build `TimestampMapping` at grab start, fit `PupilClockMapper`, wrap with `WallUtcFromPupilTime`, ingest into `PupilDualEyeRings` via `push_eye*_pupil_time` or wall-UTC `push_eye*_wall`.
+- Optional: `PupilWallUtcQueueIngestThread` drains a queue on a background thread so Pupil decode stays off the combiner thread.
 
 ## Synchronizing Basler and Pupil
 

@@ -22,6 +22,7 @@ from typing import Callable
 import numpy as np
 import pypylon.pylon as pylon
 
+from src.cameras.diagnostics.timestamp_mapping import TimestampMapping
 from src.cameras.synchronization.realtime_sync import (
     BaslerFrame,
     BaslerFrameSet,
@@ -57,6 +58,9 @@ class GrabLoopRunner:
             ``BaslerFrameSet``. When non-None, frame payloads include a BGR uint8
             image copy (see ``BaslerFrame.payload``); keep the callback fast and
             thread-safe.
+        on_timestamp_latch: If set, invoked on the grab thread once immediately
+            after ``latch_timestamp_mapping`` (same ``TimestampMapping`` used for
+            ``capture_utc_ns``). Used by the realtime pipeline to align Pupil clocks.
     """
 
     def __init__(
@@ -69,6 +73,7 @@ class GrabLoopRunner:
         ring_size: int = 240,
         combiner_tolerance_ns: int = 2_000_000,
         frameset_sink: Callable[[BaslerFrameSet], None] | None = None,
+        on_timestamp_latch: Callable[[TimestampMapping], None] | None = None,
     ) -> None:
         self._camera_array = camera_array
         self._n_cameras = n_cameras
@@ -78,6 +83,7 @@ class GrabLoopRunner:
         self._ring_size = ring_size
         self._combiner_tolerance_ns = combiner_tolerance_ns
         self._frameset_sink = frameset_sink
+        self._on_timestamp_latch = on_timestamp_latch
 
     # ------------------------------------------------------------------
     # Public grab modes
@@ -228,6 +234,11 @@ class GrabLoopRunner:
         self.disable_throughput_limit()
         starting_mapping = latch_timestamp_mapping(self._camera_array)
         self.disable_throughput_limit()
+        if self._on_timestamp_latch is not None:
+            try:
+                self._on_timestamp_latch(starting_mapping)
+            except Exception as exc:
+                logger.warning("on_timestamp_latch failed: %s", exc)
         grab_anchor_utc_ns = starting_mapping.utc_time_ns
 
         self._camera_array.StartGrabbing()

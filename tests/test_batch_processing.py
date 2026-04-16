@@ -407,3 +407,5 @@ class TestPipelineModeScaffold:
             assert gkw["output_path"] == tmp_path
             assert gkw["fps"] == 90.0
             assert gkw["nir_only"] is False
+            assert gkw.get("pupil_rings") is None
+            assert gkw.get("on_timestamp_latch") is None

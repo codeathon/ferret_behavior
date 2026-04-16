@@ -9,9 +9,10 @@ Step 5 scaffold:
 
 from __future__ import annotations
 
+import bisect
 from collections import deque
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Sequence
 
 
 @dataclass(frozen=True)
@@ -115,4 +116,37 @@ def associate_pupil_frames_to_basler(
     """Associate nearest Pupil eye frame indices for one Basler UTC timestamp."""
     eye0_idx = nearest_timestamp_index(pupil_eye0_timestamps_utc_ns, basler_utc_ns)
     eye1_idx = nearest_timestamp_index(pupil_eye1_timestamps_utc_ns, basler_utc_ns)
+    return eye0_idx, eye1_idx
+
+
+def nearest_sorted_timestamp_index(sorted_ts: Sequence[int], target_utc_ns: int) -> int:
+    """
+    Return index of nearest timestamp in **strictly non-decreasing** ``sorted_ts``.
+
+    O(log n) via bisect; raises if ``sorted_ts`` is empty.
+    """
+    if not sorted_ts:
+        raise ValueError("sorted_ts must be non-empty")
+    i = bisect.bisect_left(sorted_ts, target_utc_ns)
+    if i <= 0:
+        return 0
+    if i >= len(sorted_ts):
+        return len(sorted_ts) - 1
+    before = sorted_ts[i - 1]
+    after = sorted_ts[i]
+    return i - 1 if abs(target_utc_ns - before) <= abs(after - target_utc_ns) else i
+
+
+def associate_pupil_frames_to_basler_sorted(
+    basler_utc_ns: int,
+    pupil_eye0_timestamps_utc_ns: Sequence[int],
+    pupil_eye1_timestamps_utc_ns: Sequence[int],
+) -> tuple[int, int]:
+    """
+    Associate nearest Pupil eye frame indices when timestamp lists are sorted.
+
+    Same semantics as :func:`associate_pupil_frames_to_basler` but O(log n) per eye.
+    """
+    eye0_idx = nearest_sorted_timestamp_index(pupil_eye0_timestamps_utc_ns, basler_utc_ns)
+    eye1_idx = nearest_sorted_timestamp_index(pupil_eye1_timestamps_utc_ns, basler_utc_ns)
     return eye0_idx, eye1_idx

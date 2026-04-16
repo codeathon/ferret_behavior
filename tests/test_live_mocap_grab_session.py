@@ -54,9 +54,15 @@ def test_grab_n_frames_publish_invokes_grab_with_sink_and_publishes(
         def close_camera_array(self) -> None:
             pass
 
-        def grab_n_frames(self, n: int, frameset_sink: object | None = None) -> None:
+        def grab_n_frames(
+            self,
+            n: int,
+            frameset_sink: object | None = None,
+            on_timestamp_latch: object | None = None,
+        ) -> None:
             captured["n_frames"] = n
             captured["sink"] = frameset_sink
+            captured["on_timestamp_latch"] = on_timestamp_latch
             img = np.zeros((4, 4, 3), dtype=np.uint8)
             bset = BaslerFrameSet(
                 anchor_utc_ns=1000,
@@ -92,6 +98,7 @@ def test_grab_n_frames_publish_invokes_grab_with_sink_and_publishes(
     )
     assert captured["n_frames"] == 3
     assert captured["sink"] is not None
+    assert captured.get("on_timestamp_latch") is None
     assert summary is not None
     assert summary.packet_count == 1
 
@@ -151,12 +158,26 @@ def test_grab_n_frames_publish_configures_wire_overflow_policy(
         def close_camera_array(self) -> None:
             pass
 
-        def grab_n_frames(self, n: int, frameset_sink: object | None = None) -> None:
+        def grab_n_frames(
+            self,
+            n: int,
+            frameset_sink: object | None = None,
+            on_timestamp_latch: object | None = None,
+        ) -> None:
+            captured["grab_on_timestamp_latch"] = on_timestamp_latch
             _ = n, frameset_sink
 
     class _FakeWire:
-        def __init__(self, max_queue_size: int) -> None:
+        def __init__(
+            self,
+            max_queue_size: int,
+            *,
+            pupil_rings: object | None = None,
+            pupil_stale_max_delta_ns: int | None = None,
+        ) -> None:
             captured["max_queue_size"] = max_queue_size
+            captured["pupil_rings"] = pupil_rings
+            captured["pupil_stale_max_delta_ns"] = pupil_stale_max_delta_ns
 
         def configure_overflow_policy(self, *, overflow_policy: str, put_timeout_ms: int) -> None:
             captured["overflow_policy"] = overflow_policy
@@ -200,3 +221,6 @@ def test_grab_n_frames_publish_configures_wire_overflow_policy(
     assert captured["max_queue_size"] == 13
     assert captured["overflow_policy"] == "block_with_timeout"
     assert captured["put_timeout_ms"] == 21
+    assert captured["pupil_rings"] is None
+    assert captured["pupil_stale_max_delta_ns"] is None
+    assert captured.get("grab_on_timestamp_latch") is None

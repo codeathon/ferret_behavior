@@ -117,8 +117,9 @@ class RealtimeInferenceRuntime(ABC):
         """
         Run inference for one frame.
 
-        Image backends (e.g. ``onnx_images``) read ``frame_set.images_bgr``;
-        others ignore ``frame_set``.
+        Image backends (e.g. ``onnx_images``) read ``frame_set.images_bgr``; optional
+        ``eye0_bgr`` / ``eye1_bgr`` on :class:`~src.ferret_gaze.realtime.live_frame_set.LiveMocapFrameSet`
+        are filled when live Pupil association is enabled (future eye-specific models).
         """
 
 

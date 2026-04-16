@@ -40,9 +40,12 @@ class PupilClockMapper:
 
     def pupil_to_host_utc_ns(self, pupil_time_ns: int) -> int:
         """
-        Map Pupil time to host UTC-like nanoseconds.
+        Map Pupil time into the same numeric domain as ``ClockSample.host_monotonic_ns``.
 
-        drift_ppm is applied as multiplicative scale around 1.0.
+        Despite the name, this is **not** wall Unix UTC; pair with
+        :class:`~src.cameras.synchronization.utc_clock_bridge.WallUtcFromPupilTime`
+        to compare against Basler ``capture_utc_ns``. ``drift_ppm`` scales Pupil time
+        around 1.0 before applying ``offset_ns``.
         """
         scale = 1.0 + (self._drift_ppm / 1_000_000.0)
         return int((pupil_time_ns * scale) + self._offset_ns)

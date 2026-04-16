@@ -8,11 +8,14 @@ so combiner frame-sets are queued and processed on a background publisher thread
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 from typing import Literal
 
 from src.cameras.camera_config import configure_all_cameras
+from src.cameras.diagnostics.timestamp_mapping import TimestampMapping
 from src.cameras.multicamera_recording import MultiCameraRecording
+from src.cameras.synchronization.pupil_dual_eye_rings import PupilDualEyeRings
 from src.ferret_gaze.realtime.grab_live_wiring import LiveMocapGrabPublishWire
 from src.ferret_gaze.realtime.latency_metrics import LatencySummary
 from src.ferret_gaze.realtime.per_frame_compute import (
@@ -48,6 +51,9 @@ def run_live_mocap_grab_n_frames_publish(
 	skull_solver: RealtimeSkullSolver | None = None,
 	calibrator: RollingEyeCalibrator | None = None,
 	fuser: RealtimeGazeFuser | None = None,
+	pupil_rings: PupilDualEyeRings | None = None,
+	pupil_stale_max_delta_ns: int | None = None,
+	on_timestamp_latch: Callable[[TimestampMapping], None] | None = None,
 ) -> LatencySummary | None:
 	"""
 	Open cameras, start the live publish consumer, grab ``n_frames`` synchronized sets, then stop.
@@ -55,6 +61,10 @@ def run_live_mocap_grab_n_frames_publish(
 	Does **not** close ``publisher``; the caller should do that after this returns.
 	``n_frames`` must be positive.
 	Optional ``calibrator`` / ``fuser`` override the stub defaults (see ``create_*`` factories).
+	Optional ``pupil_rings`` attaches nearest Pupil eye frames to each queued live
+	frame set (see ``pupil_stale_max_delta_ns``).
+	Optional ``on_timestamp_latch`` runs on the grab thread right after Basler latch
+	(same mapping as ``capture_utc_ns``) — used to install :class:`~src.cameras.synchronization.utc_clock_bridge.WallUtcFromPupilTime`.
 	"""
 	if n_frames < 1:
 		raise ValueError("n_frames must be at least 1")
@@ -75,7 +85,11 @@ def run_live_mocap_grab_n_frames_publish(
 		mcr.camera_information()
 		mcr.create_video_writers_ffmpeg()
 
-		wire = LiveMocapGrabPublishWire(max_queue_size=wire_queue_size)
+		wire = LiveMocapGrabPublishWire(
+			max_queue_size=wire_queue_size,
+			pupil_rings=pupil_rings,
+			pupil_stale_max_delta_ns=pupil_stale_max_delta_ns,
+		)
 		wire.configure_overflow_policy(
 			overflow_policy=wire_overflow_policy,
 			put_timeout_ms=wire_put_timeout_ms,
@@ -98,7 +112,11 @@ def run_live_mocap_grab_n_frames_publish(
 				fps,
 				nir_only,
 			)
-			mcr.grab_n_frames(n_frames, frameset_sink=wire)
+			mcr.grab_n_frames(
+				n_frames,
+				frameset_sink=wire,
+				on_timestamp_latch=on_timestamp_latch,
+			)
 		finally:
 			summary = wire.stop_background_publisher()
 	finally:

@@ -67,6 +67,14 @@ def test_build_synthetic_live_mocap_frame_sets_shape() -> None:
     assert fss[1].anchor_utc_ns == 100 + 1_000_000
 
 
+def test_build_synthetic_live_mocap_frame_sets_dummy_pupil_eyes() -> None:
+    fss = build_synthetic_live_mocap_frame_sets(1, attach_dummy_pupil_eyes=True, anchor_base_ns=9_000)
+    assert fss[0].eye0_bgr is not None
+    assert fss[0].eye1_bgr is not None
+    assert fss[0].pupil_eye0_utc_ns == 9_000
+    assert fss[0].pupil_eye0_stale is False
+
+
 def test_build_synthetic_rejects_non_positive() -> None:
     with pytest.raises(ValueError):
         build_synthetic_live_mocap_frame_sets(0)
