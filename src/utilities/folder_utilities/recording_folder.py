@@ -831,20 +831,31 @@ class RecordingFolder(BaseModel):
             return False
 
 
-    def check_dlc_output(self, enforce_toy: bool = True, enforce_annotated: bool = True):
+    def check_dlc_output(
+        self,
+        enforce_toy: bool = True,
+        enforce_annotated: bool = True,
+        include_eye: bool = True,
+    ):
         try:
             self.check_synchronization()
         except ValueError:
             raise ValueError("Synchronization failed, dlc output cannot be checked")
 
-        for name, path in {
-            "eye_dlc_output_folder": self.eye_dlc_output,
-            "eye_dlc_output_flipped_folder": self.eye_dlc_output_flipped,
-            "eye_skellyclicker_labels": self.eye_data_skellyclicker_labels,
-            "eye_skellyclicker_labels_flipped": self.eye_data_skellyclicker_labels_flipped,
+        required_paths = {
             "mocap_dlc_output_folder": self.head_body_dlc_output,
-            "mocap_skellyclicker_labels": self.head_body_skellyclicker_labels
-        }.items():
+            "mocap_skellyclicker_labels": self.head_body_skellyclicker_labels,
+        }
+        if include_eye:
+            required_paths.update(
+                {
+                    "eye_dlc_output_folder": self.eye_dlc_output,
+                    "eye_dlc_output_flipped_folder": self.eye_dlc_output_flipped,
+                    "eye_skellyclicker_labels": self.eye_data_skellyclicker_labels,
+                    "eye_skellyclicker_labels_flipped": self.eye_data_skellyclicker_labels_flipped,
+                }
+            )
+        for name, path in required_paths.items():
             if path is None:
                 raise ValueError(f"{name} does not exist, dlc output failed")
             
@@ -857,14 +868,15 @@ class RecordingFolder(BaseModel):
                     raise ValueError(f"{name} does not exist, dlc output failed")
         
         if enforce_annotated:
-            for name, path in {
-                "left_eye_annotated_video": self.left_eye_annotated_video,
-                "left_eye_annotated_flipped_video": self.left_eye_annotated_flipped_video,
-                "right_eye_annotated_video": self.right_eye_annotated_video,
-                "right_eye_annotated_flipped_video": self.right_eye_annotated_flipped_video,
-            }.items():
-                if path is None:
-                    raise ValueError(f"{name} does not exist, dlc output failed")
+            if include_eye:
+                for name, path in {
+                    "left_eye_annotated_video": self.left_eye_annotated_video,
+                    "left_eye_annotated_flipped_video": self.left_eye_annotated_flipped_video,
+                    "right_eye_annotated_video": self.right_eye_annotated_video,
+                    "right_eye_annotated_flipped_video": self.right_eye_annotated_flipped_video,
+                }.items():
+                    if path is None:
+                        raise ValueError(f"{name} does not exist, dlc output failed")
             for video in [
                 BaslerCamera.TOPDOWN.value,
                 BaslerCamera.SIDE_0.value,
@@ -877,9 +889,18 @@ class RecordingFolder(BaseModel):
                 except ValueError:
                     raise ValueError(f"Could not find annotated video for {video} in {self.head_body_annotated_videos}")
                 
-    def is_dlc_processed(self, enforce_toy: bool = True, enforce_annotated: bool = True) -> bool:
+    def is_dlc_processed(
+        self,
+        enforce_toy: bool = True,
+        enforce_annotated: bool = True,
+        include_eye: bool = True,
+    ) -> bool:
         try:
-            self.check_dlc_output(enforce_toy=enforce_toy, enforce_annotated=enforce_annotated)
+            self.check_dlc_output(
+                enforce_toy=enforce_toy,
+                enforce_annotated=enforce_annotated,
+                include_eye=include_eye,
+            )
             return True
         except ValueError:
             return False
@@ -895,9 +916,14 @@ class RecordingFolder(BaseModel):
         except ValueError:
             return False
 
-    def check_triangulation(self, enforce_toy: bool = True, enforce_annotated: bool = True):
+    def check_triangulation(
+        self,
+        enforce_toy: bool = True,
+        enforce_annotated: bool = True,
+        include_eye: bool = True,
+    ):
         try:
-            self.check_dlc_output(enforce_toy=enforce_toy)
+            self.check_dlc_output(enforce_toy=enforce_toy, include_eye=include_eye)
         except ValueError as e:
             logger.debug("DLC output failed: %s", e)
             raise ValueError("DLC output failed, triangulation cannot be checked")
