@@ -11,6 +11,7 @@ import json
 import os
 import subprocess
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
@@ -46,6 +47,32 @@ logger = get_logger(__name__)
 HEAD_DLC_ITERATION = 17
 EYE_DLC_ITERATION = 30
 TOY_DLC_ITERATION = 10
+
+
+@dataclass(frozen=True)
+class ExternalToolPaths:
+	"""Subprocess interpreters and scripts for skellyclicker, dlc_to_3d, freemocap."""
+
+	skellyclicker_python: str = "/home/scholl-lab/anaconda3/envs/skellyclicker/bin/python"
+	skellyclicker_script: str = "/home/scholl-lab/skellyclicker/skellyclicker/scripts/process_recording.py"
+	triangulation_python: str = "/home/scholl-lab/Documents/git_repos/dlc_to_3d/.venv/bin/python"
+	triangulation_script: str = (
+		"/home/scholl-lab/Documents/git_repos/dlc_to_3d/dlc_reconstruction/dlc_to_3d.py"
+	)
+	calibration_python: str = "/home/scholl-lab/anaconda3/envs/fmc/bin/python"
+	calibration_script: str = (
+		"/home/scholl-lab/Documents/git_repos/freemocap/experimental/batch_process/"
+		"headless_calibration.py"
+	)
+
+
+_EXTERNAL_TOOLS = ExternalToolPaths()
+
+
+def set_external_tool_paths(tools: ExternalToolPaths) -> None:
+	"""Override default lab-machine subprocess paths (e.g. from offline_pipeline.json)."""
+	global _EXTERNAL_TOOLS
+	_EXTERNAL_TOOLS = tools
 
 
 def _dlc_metadata_is_outdated(dlc_output_folder: Path | None, required_iteration: int) -> bool:
@@ -139,10 +166,12 @@ def _run_subprocess_streaming(command_list: list, clean_env: dict, use_pty: bool
 
 def run_skellyclicker_subprocess(
         recording_folder_path: Path,
-        venv_path: str = "/home/scholl-lab/anaconda3/envs/skellyclicker/bin/python",
-        script_path: str = "/home/scholl-lab/skellyclicker/skellyclicker/scripts/process_recording.py",
+        venv_path: str | None = None,
+        script_path: str | None = None,
         include_eye: bool = True,
     ):
+    venv_path = venv_path or _EXTERNAL_TOOLS.skellyclicker_python
+    script_path = script_path or _EXTERNAL_TOOLS.skellyclicker_script
     command_list = [venv_path, "-u", script_path, recording_folder_path]
     if not include_eye:
         command_list.append("--skip-eye")
@@ -152,10 +181,12 @@ def run_skellyclicker_subprocess(
 def run_triangulation_subprocess(
         recording_folder_path: Path,
         calibration_toml_path: Path,
-        venv_path: str = "/home/scholl-lab/Documents/git_repos/dlc_to_3d/.venv/bin/python",
-        script_path: str = "/home/scholl-lab/Documents/git_repos/dlc_to_3d/dlc_reconstruction/dlc_to_3d.py",
+        venv_path: str | None = None,
+        script_path: str | None = None,
         skip_toy: bool = False,
     ):
+    venv_path = venv_path or _EXTERNAL_TOOLS.triangulation_python
+    script_path = script_path or _EXTERNAL_TOOLS.triangulation_script
     command_list = [venv_path, script_path, recording_folder_path, calibration_toml_path]
     if skip_toy:
         command_list.append("--skip-toy")
@@ -164,9 +195,11 @@ def run_triangulation_subprocess(
 
 def run_calibration_subprocess(
         calibration_videos_path: Path,
-        venv_path: str = "/home/scholl-lab/anaconda3/envs/fmc/bin/python",
-        script_path: str = "/home/scholl-lab/Documents/git_repos/freemocap/experimental/batch_process/headless_calibration.py",
+        venv_path: str | None = None,
+        script_path: str | None = None,
     ):
+    venv_path = venv_path or _EXTERNAL_TOOLS.calibration_python
+    script_path = script_path or _EXTERNAL_TOOLS.calibration_script
     command_list = [
         venv_path, script_path, calibration_videos_path,
         "--square-size", "57", "--5x3", "--use-groundplane",
