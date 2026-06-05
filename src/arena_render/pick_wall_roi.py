@@ -70,6 +70,18 @@ def _parse_roi_string(roi_text: str) -> tuple[int, int, int, int]:
 	return x, y, w, h
 
 
+def _extents_to_roi(extents: tuple[float, float, float, float]) -> tuple[int, int, int, int]:
+	"""Convert RectangleSelector extents (xmin, xmax, ymin, ymax) to x,y,w,h."""
+	xmin, xmax, ymin, ymax = extents
+	x = int(round(xmin))
+	y = int(round(ymin))
+	w = int(round(xmax - xmin))
+	h = int(round(ymax - ymin))
+	if w <= 0 or h <= 0:
+		raise RuntimeError("No ROI selected. Drag a rectangle, then close the window.")
+	return x, y, w, h
+
+
 def _pick_roi_matplotlib(frame: np.ndarray, window_title: str) -> tuple[int, int, int, int]:
 	"""Drag a box with matplotlib (avoids OpenCV Qt highgui issues)."""
 	import matplotlib.pyplot as plt
@@ -78,26 +90,17 @@ def _pick_roi_matplotlib(frame: np.ndarray, window_title: str) -> tuple[int, int
 	if frame.shape[0] == 0 or frame.shape[1] == 0:
 		raise RuntimeError("Frame has zero width or height — cannot show ROI picker.")
 
-	result: list[tuple[int, int, int, int] | None] = [None]
 	rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-
-	def onselect(eclick, erelease) -> None:
-		# Matplotlib image coords: x right, y down (matches OpenCV roi_px).
-		if eclick.xdata is None or erelease.xdata is None:
-			return
-		x1 = int(min(eclick.xdata, erelease.xdata))
-		y1 = int(min(eclick.ydata, erelease.ydata))
-		x2 = int(max(eclick.xdata, erelease.xdata))
-		y2 = int(max(eclick.ydata, erelease.ydata))
-		result[0] = (x1, y1, x2 - x1, y2 - y1)
-
 	fig, axis = plt.subplots(figsize=(14, 10))
 	axis.imshow(rgb)
-	axis.set_title(f"{window_title}\nDrag box around wall screen, close window when done")
-	RectangleSelector(
+	axis.set_title(
+		f"{window_title}\n"
+		"Click-drag a box around the wall screen, then close this window"
+	)
+	# matplotlib >=3.7 removed drawtype; read extents after plt.show() for compatibility.
+	selector = RectangleSelector(
 		axis,
-		onselect,
-		drawtype="box",
+		onselect=lambda *args, **kwargs: None,
 		useblit=True,
 		button=[1],
 		minspanx=5,
@@ -106,9 +109,7 @@ def _pick_roi_matplotlib(frame: np.ndarray, window_title: str) -> tuple[int, int
 		interactive=True,
 	)
 	plt.show()
-	if result[0] is None:
-		raise RuntimeError("No ROI selected. Drag a rectangle, then close the window.")
-	return result[0]
+	return _extents_to_roi(selector.extents)
 
 
 def _pick_roi_opencv(frame: np.ndarray, window_title: str) -> tuple[int, int, int, int]:
