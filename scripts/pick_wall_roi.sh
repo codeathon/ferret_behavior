@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
-# Pick a wall ROI from a synced overhead video (needs display / ssh -X).
+# Pick a wall ROI from a synced overhead video (matplotlib GUI; needs display or ssh -X).
 #
 # Usage:
 #   export SESSION_ROOT=/home/scholl-lab/ferret_recordings/session_...
 #   ./scripts/pick_wall_roi.sh --camera 24676894 --wall-id north
-#   ./scripts/pick_wall_roi.sh --video /path/to/24676894_....mp4 --wall-id east
+#   ./scripts/pick_wall_roi.sh --camera 24676894 --mode export   # no GUI; measure ROI manually
+#   ./scripts/pick_wall_roi.sh --camera 24676894 --roi 412,180,320,240
 
 set -euo pipefail
 
