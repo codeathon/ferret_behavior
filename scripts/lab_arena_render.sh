@@ -7,6 +7,7 @@
 #   ./scripts/lab_arena_render.sh sync
 #   ./scripts/lab_arena_render.sh rerun
 #   ./scripts/lab_arena_render.sh extract-textures --max-frames 30
+#   ./scripts/lab_arena_render.sh export-unreal-bundle
 
 set -euo pipefail
 
@@ -47,5 +48,10 @@ while [[ $# -gt 0 ]]; do
 		*) echo "Unknown arg: $1"; exit 1 ;;
 	esac
 done
+
+case "$CMD" in
+	validate|sync|rerun|extract-textures|export-unreal-bundle) ;;
+	*) echo "Unknown command: $CMD"; exit 1 ;;
+esac
 
 uv run python -m src.arena_render.run_arena_render "${ARGS[@]}" "$CMD"

@@ -20,6 +20,7 @@ from src.arena_render.rerun_arena_viewer import launch_arena_rerun_viewer
 from src.arena_render.session_inputs import resolve_arena_session_inputs
 from src.arena_render.timeline_exporter import build_stimulus_timeline, write_stimulus_timeline
 from src.arena_render.validate_arena import print_validation_report, validate_arena_session
+from src.arena_render.export_unreal_bundle import build_unreal_arena_manifest, write_unreal_arena_manifest
 from src.arena_render.wall_texture_extractor import extract_wall_textures_for_session
 from src.cameras.postprocess import postprocess
 from src.utilities.logging_config import get_logger
@@ -117,6 +118,22 @@ def cmd_extract_textures(config: ArenaRenderConfig) -> int:
 	return 0
 
 
+def cmd_export_unreal_bundle(config: ArenaRenderConfig) -> int:
+	assert config.session_root is not None
+	session_root = config.session_root.resolve()
+	_resolve_geometry(config, session_root)
+	geometry_path = config.geometry_path or (session_root / "arena_geometry.json")
+	manifest = build_unreal_arena_manifest(
+		session_root,
+		geometry_path,
+		calibration_toml_path=config.calibration_toml_path,
+	)
+	output_dir = config.output_dir or _default_output_dir(config.session_root)
+	manifest_path = write_unreal_arena_manifest(manifest, output_dir / "unreal_arena_manifest.json")
+	logger.info("Unreal manifest ready: %s", manifest_path)
+	return 0
+
+
 def build_arg_parser() -> argparse.ArgumentParser:
 	parser = argparse.ArgumentParser(description="Offline arena virtual render pipeline")
 	parser.add_argument("--config", type=Path, default=None, help="JSON config path")
@@ -134,7 +151,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
 	parser.add_argument("--preview-frame", type=int, default=0, help="Frame for Rerun texture preview")
 	parser.add_argument(
 		"command",
-		choices=("validate", "sync", "rerun", "extract-textures"),
+		choices=("validate", "sync", "rerun", "extract-textures", "export-unreal-bundle"),
 		help="Pipeline step to run",
 	)
 	return parser
@@ -169,6 +186,8 @@ def main(argv: list[str] | None = None) -> int:
 		return cmd_rerun(config, preview_frame=args.preview_frame)
 	if args.command == "extract-textures":
 		return cmd_extract_textures(config)
+	if args.command == "export-unreal-bundle":
+		return cmd_export_unreal_bundle(config)
 	return 1
 
 
