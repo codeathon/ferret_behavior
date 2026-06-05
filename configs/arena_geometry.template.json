@@ -1,0 +1,50 @@
+{
+	"stimulus_source": "video_crop",
+	"notes": "Copy to session/arena_geometry.json and set ROI pixels per wall after inspecting synced overhead video.",
+	"arena_mm": {
+		"center": [0, 0, 500],
+		"half_size": [500, 500, 500]
+	},
+	"walls": [
+		{
+			"id": "north",
+			"screen_center_mm": [0, 500, 800],
+			"screen_half_size_mm": [200, 150],
+			"normal": [0, 1, 0],
+			"source_camera_name": "24676894",
+			"roi_px": {"x": 0, "y": 0, "w": 100, "h": 100},
+			"texture_width_px": 512,
+			"texture_height_px": 512
+		},
+		{
+			"id": "south",
+			"screen_center_mm": [0, -500, 800],
+			"screen_half_size_mm": [200, 150],
+			"normal": [0, -1, 0],
+			"source_camera_name": "24676894",
+			"roi_px": {"x": 0, "y": 0, "w": 100, "h": 100},
+			"texture_width_px": 512,
+			"texture_height_px": 512
+		},
+		{
+			"id": "east",
+			"screen_center_mm": [500, 0, 800],
+			"screen_half_size_mm": [200, 150],
+			"normal": [1, 0, 0],
+			"source_camera_name": "24908831",
+			"roi_px": {"x": 0, "y": 0, "w": 100, "h": 100},
+			"texture_width_px": 512,
+			"texture_height_px": 512
+		},
+		{
+			"id": "west",
+			"screen_center_mm": [-500, 0, 800],
+			"screen_half_size_mm": [200, 150],
+			"normal": [-1, 0, 0],
+			"source_camera_name": "24908831",
+			"roi_px": {"x": 0, "y": 0, "w": 100, "h": 100},
+			"texture_width_px": 512,
+			"texture_height_px": 512
+		}
+	]
+}
