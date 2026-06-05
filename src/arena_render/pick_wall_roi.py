@@ -156,12 +156,13 @@ def _print_snippet(
 	w: int,
 	h: int,
 ) -> None:
+	# 3D placement is optional — arena_config fills defaults from wall id.
 	snippet = {
 		"id": wall_id,
 		"source_camera_name": camera_name,
 		"roi_px": {"x": x, "y": y, "w": w, "h": h},
 	}
-	print("\nPaste into arena_geometry.json walls[]:\n")
+	print("\nPaste into arena_geometry.json under \"walls\":\n")
 	print(json.dumps(snippet, indent="\t"))
 
 
