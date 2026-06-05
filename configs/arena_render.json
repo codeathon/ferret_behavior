@@ -1,0 +1,8 @@
+{
+	"session_root": "/home/scholl-lab/ferret_recordings/session_2026-03-19_psychopy_trial_1_ferret411",
+	"calibration_toml_path": null,
+	"geometry_path": "arena_geometry.template.json",
+	"output_dir": null,
+	"frame_stride": 1,
+	"max_frames": null
+}
