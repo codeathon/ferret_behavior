@@ -1,0 +1,23 @@
+{
+	"session_root": "/home/scholl-lab/ferret_recordings/session_2025-10-22_ferret_420_EO13",
+	"clip_name": null,
+	"calibration_toml_path": null,
+	"local_inspection_dir": "~/ferret_pov_inspection",
+	"include_eye": true,
+	"overwrite_synchronization": false,
+	"overwrite_calibration": false,
+	"overwrite_dlc": false,
+	"overwrite_triangulation": false,
+	"overwrite_eye_postprocessing": false,
+	"overwrite_skull_postprocessing": false,
+	"overwrite_gaze": false,
+	"reprocess_gaze_clip": false,
+	"external_tools": {
+		"skellyclicker_python": "/home/scholl-lab/anaconda3/envs/skellyclicker/bin/python",
+		"skellyclicker_script": "/home/scholl-lab/skellyclicker/skellyclicker/scripts/process_recording.py",
+		"triangulation_python": "/home/scholl-lab/Documents/git_repos/dlc_to_3d/.venv/bin/python",
+		"triangulation_script": "/home/scholl-lab/Documents/git_repos/dlc_to_3d/dlc_reconstruction/dlc_to_3d.py",
+		"calibration_python": "/home/scholl-lab/anaconda3/envs/fmc/bin/python",
+		"calibration_script": "/home/scholl-lab/Documents/git_repos/freemocap/experimental/batch_process/headless_calibration.py"
+	}
+}
