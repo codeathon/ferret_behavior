@@ -217,15 +217,20 @@ def _resolve_overwrite_flags(
     overwrite_eye_postprocessing: bool,
     overwrite_skull_postprocessing: bool,
     overwrite_gaze: bool,
+    include_eye: bool = True,
 ) -> dict:
     """
     Propagate overwrite flags through dependent pipeline steps and force DLC
     reprocessing if any outputs were produced with an outdated model iteration.
     Returns a dict of resolved flag values keyed by step name.
     """
+    eye_dlc_outdated = (
+        include_eye
+        and _dlc_metadata_is_outdated(recording_folder.eye_dlc_output, EYE_DLC_ITERATION)
+    )
     if not overwrite_dlc and (
         _dlc_metadata_is_outdated(recording_folder.head_body_dlc_output, HEAD_DLC_ITERATION)
-        or _dlc_metadata_is_outdated(recording_folder.eye_dlc_output, EYE_DLC_ITERATION)
+        or eye_dlc_outdated
         or _dlc_metadata_is_outdated(recording_folder.toy_dlc_output, TOY_DLC_ITERATION)
     ):
         logger.warning("DLC outputs are from an outdated model iteration, forcing DLC reprocessing")
@@ -272,9 +277,10 @@ def _run_postprocessing(
             skip_skull=not run_skull,
             skip_gaze=not run_gaze,
         )
-    recording_folder.check_eye_postprocessing()
+    if include_eye:
+        recording_folder.check_eye_postprocessing()
+        recording_folder.check_gaze_postprocessing()
     recording_folder.check_skull_postprocessing()
-    recording_folder.check_gaze_postprocessing()
     logger.info("Gaze calculations complete")
     logger.info("Session processed: %s", recording_folder_path)
 
@@ -298,6 +304,7 @@ def _run_offline_pipeline(
         overwrite_synchronization, overwrite_calibration, overwrite_dlc,
         overwrite_triangulation, overwrite_eye_postprocessing,
         overwrite_skull_postprocessing, overwrite_gaze,
+        include_eye=include_eye,
     )
 
     # Synchronization
@@ -315,10 +322,13 @@ def _run_offline_pipeline(
     logger.info("Calibration complete")
 
     # DLC
-    if flags["dlc"] or not recording_folder.is_dlc_processed():
+    if flags["dlc"] or not recording_folder.is_dlc_processed(include_eye=include_eye):
         logger.info("Running pose estimation...")
-        run_skellyclicker_subprocess(recording_folder_path=recording_folder_path)
-    recording_folder.check_dlc_output()
+        run_skellyclicker_subprocess(
+            recording_folder_path=recording_folder_path,
+            include_eye=include_eye,
+        )
+    recording_folder.check_dlc_output(include_eye=include_eye)
     logger.info("Pose estimation complete")
 
     # Triangulation
@@ -332,7 +342,7 @@ def _run_offline_pipeline(
             recording_folder_path=recording_folder_path,
             calibration_toml_path=calibration_toml_path,
         )
-    recording_folder.check_triangulation()
+    recording_folder.check_triangulation(include_eye=include_eye)
     logger.info("Triangulation complete")
 
     _run_postprocessing(recording_folder, recording_folder_path, include_eye, flags)

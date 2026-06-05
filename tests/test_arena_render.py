@@ -47,6 +47,23 @@ def _build_synced_session(tmp_path: Path) -> Path:
 	return session
 
 
+def test_minimal_wall_geometry_from_roi_picker() -> None:
+	"""pick_wall_roi snippet (roi only) should validate with 3D defaults."""
+	geometry = ArenaRenderGeometry.model_validate(
+		{
+			"walls": [
+				{
+					"id": "north",
+					"source_camera_name": "24676894",
+					"roi_px": {"x": 8, "y": 8, "w": 602, "h": 232},
+				}
+			]
+		}
+	)
+	assert geometry.walls[0].screen_center_mm == [0.0, 500.0, 800.0]
+	assert geometry.walls[0].normal == [0.0, 1.0, 0.0]
+
+
 def test_arena_geometry_roundtrip(tmp_path: Path) -> None:
 	geometry = ArenaRenderGeometry.from_json_file(
 		Path(__file__).resolve().parents[1] / "configs" / "arena_geometry.template.json"
