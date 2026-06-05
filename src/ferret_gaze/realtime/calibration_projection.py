@@ -25,15 +25,14 @@ logger = get_logger(__name__)
 
 def discover_session_calibration_toml(session_root: Path) -> Path | None:
     """
-    Return the first ``*camera_calibration.toml`` under ``session_root/calibration``.
+    Return the first ``*camera_calibration.toml`` for ``session_root``.
 
-    Matches ``RecordingFolder.calibration_toml_path`` glob semantics.
+    Delegates to ``session_paths.discover_calibration_toml`` so trial sessions
+    without a local TOML can still resolve calibration via explicit config paths.
     """
-    cal_dir = session_root / "calibration"
-    if not cal_dir.is_dir():
-        return None
-    matches = sorted(cal_dir.glob("*camera_calibration.toml"))
-    return matches[0] if matches else None
+    from src.utilities.folder_utilities.session_paths import discover_calibration_toml
+
+    return discover_calibration_toml(session_root)
 
 
 def _as_float_matrix3(value: Any, *, label: str) -> np.ndarray:

@@ -20,6 +20,16 @@ def test_run_from_config_validate_only(tmp_path: Path) -> None:
 	assert code == 0
 
 
+def test_run_from_config_pipeline_fails_without_calibration_toml(tmp_path: Path) -> None:
+	from tests.test_session_paths import _build_base_data_session
+
+	session = _build_base_data_session(tmp_path)
+	(session / "calibration").mkdir(parents=True)
+	config = OfflinePipelineConfig(session_root=session)
+	code = run_from_config(config, skip_gaze=True, skip_copy=True)
+	assert code == 1
+
+
 def test_run_from_config_runs_pipeline_and_gaze(tmp_path: Path) -> None:
 	session = _build_minimal_raw_session(tmp_path)
 	clip = session / "clips" / "test_clip"

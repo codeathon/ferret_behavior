@@ -1,7 +1,7 @@
 {
-	"session_root": "/home/scholl-lab/ferret_recordings/session_2025-10-22_ferret_420_EO13",
+	"session_root": "/home/scholl-lab/ferret_recordings/session_2026-03-19_psychopy_trial_1_ferret411",
 	"clip_name": null,
-	"calibration_toml_path": null,
+	"calibration_toml_path": "/home/scholl-lab/ferret_recordings/session_YYYY-MM-DD_ferret_XXX/calibration/session_YYYY-MM-DD_calibration_camera_calibration.toml",
 	"local_inspection_dir": "~/ferret_pov_inspection",
 	"include_eye": true,
 	"overwrite_synchronization": false,

@@ -108,11 +108,23 @@ def test_validate_raw_session_passes(tmp_path: Path) -> None:
 	assert any(item.name == "pupil_world_video" for item in report.items)
 
 
-def test_validate_missing_calibration_fails(tmp_path: Path) -> None:
+def test_validate_missing_calibration_warns(tmp_path: Path) -> None:
 	session = _build_minimal_raw_session(tmp_path)
 	toml_path = session / "calibration" / "session_test_camera_calibration.toml"
 	toml_path.unlink()
 	report = validate_session(session, check_sync=False)
+	assert report.ok
+	assert any(
+		item.name == "calibration_toml" and item.level == ValidationLevel.WARN
+		for item in report.items
+	)
+
+
+def test_validate_missing_calibration_fails_when_required(tmp_path: Path) -> None:
+	session = _build_minimal_raw_session(tmp_path)
+	toml_path = session / "calibration" / "session_test_camera_calibration.toml"
+	toml_path.unlink()
+	report = validate_session(session, check_sync=False, require_calibration_toml=True)
 	assert not report.ok
 	assert any(item.name == "calibration_toml" for item in report.errors)
 
@@ -133,3 +145,22 @@ def test_validate_synchronized_session_warns_less_on_sync(tmp_path: Path) -> Non
 	sync_items = [item for item in report.items if item.name == "pipeline_sync"]
 	assert sync_items
 	assert sync_items[0].level == ValidationLevel.INFO
+
+
+def test_validate_base_data_pupil_output_layout(tmp_path: Path) -> None:
+	"""Psychopy-style trial session: pupil under base_data, no local calibration TOML."""
+	from tests.test_session_paths import _build_base_data_session
+
+	session = _build_base_data_session(tmp_path)
+
+	report = validate_session(session, check_sync=False)
+	assert report.ok
+	assert any(
+		item.name == "calibration_toml" and item.level == ValidationLevel.WARN
+		for item in report.items
+	)
+	assert any(
+		item.name == "pupil_timestamp_mapping" and item.level == ValidationLevel.INFO
+		for item in report.items
+	)
+	assert any(item.name == "pupil_output_folder" for item in report.items)
