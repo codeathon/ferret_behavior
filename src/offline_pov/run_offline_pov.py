@@ -26,6 +26,7 @@ from src.offline_pov.validate_session import (
 	resolve_session_paths,
 	validate_session,
 )
+from src.utilities.folder_utilities.session_paths import discover_calibration_toml
 from src.utilities.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -64,8 +65,20 @@ def _resolve_clip_path(session_root: Path, clip_name: str) -> Path:
 	return clip_path
 
 
-def run_validate(session_path: Path, *, check_calibrated: bool = False) -> bool:
-	report = validate_session(session_path, check_calibrated=check_calibrated)
+def run_validate(
+	config: OfflinePipelineConfig,
+	*,
+	check_calibrated: bool = False,
+	require_calibration_toml: bool = False,
+) -> bool:
+	session_path = config.session_root
+	assert session_path is not None
+	report = validate_session(
+		session_path,
+		calibration_toml_path=config.calibration_toml_path,
+		require_calibration_toml=require_calibration_toml,
+		check_calibrated=check_calibrated,
+	)
 	print_validation_report(report)
 	return report.ok
 
@@ -144,11 +157,27 @@ def run_from_config(
 		return 1
 
 	session_root, _ = resolve_session_paths(config.session_root)
-	if not run_validate(config.session_root):
+	if not run_validate(config, require_calibration_toml=False):
 		logger.error("Session validation failed; fix errors before running pipeline")
 		return 1
 	if validate_only:
 		return 0
+
+	# Triangulation needs a calibration TOML; trial sessions often borrow one from another session.
+	if not skip_pipeline and "clips" not in _resolve_recording_folder(config.session_root).parts:
+		resolved_toml = discover_calibration_toml(session_root, config.calibration_toml_path)
+		if resolved_toml is None:
+			logger.error(
+				"No *camera_calibration.toml found. Set calibration_toml_path in "
+				"configs/offline_pipeline.json to a prior calibrated session, e.g. "
+				"/home/scholl-lab/ferret_recordings/session_YYYY-MM-DD_.../calibration/"
+				"session_*_camera_calibration.toml"
+			)
+			return 1
+		config.calibration_toml_path = resolved_toml
+		if not run_validate(config, require_calibration_toml=True):
+			logger.error("Calibration TOML validation failed")
+			return 1
 
 	recording_folder = _resolve_recording_folder(config.session_root)
 	if not skip_pipeline and "clips" not in recording_folder.parts:
@@ -175,6 +204,17 @@ def build_arg_parser() -> argparse.ArgumentParser:
 	parser.add_argument("--session", type=Path, default=None, help="Session root or full_recording path")
 	parser.add_argument("--clip", type=str, default=None, help="Clip name under session/clips/")
 	parser.add_argument("--validate-only", action="store_true", help="Only validate session layout")
+	parser.add_argument(
+		"--calibration-toml",
+		type=Path,
+		default=None,
+		help="Reuse *camera_calibration.toml from another session (trial folders often have none)",
+	)
+	parser.add_argument(
+		"--require-calibration",
+		action="store_true",
+		help="Treat missing calibration TOML as an error during --validate-only",
+	)
 	parser.add_argument("--check-calibrated", action="store_true", help="Also require calibration outputs")
 	parser.add_argument("--skip-pipeline", action="store_true", help="Skip full_pipeline batch step")
 	parser.add_argument("--skip-gaze", action="store_true", help="Skip gaze + Blender script generation")
@@ -197,6 +237,8 @@ def main(argv: list[str] | None = None) -> int:
 		config.session_root = args.session.resolve()
 	if args.clip is not None:
 		config.clip_name = args.clip
+	if args.calibration_toml is not None:
+		config.calibration_toml_path = args.calibration_toml.resolve()
 	if args.local_inspection_dir is not None:
 		config.local_inspection_dir = args.local_inspection_dir.resolve()
 
@@ -204,7 +246,11 @@ def main(argv: list[str] | None = None) -> int:
 		logger.error("--session is required for --validate-only")
 		return 1
 	if args.validate_only:
-		ok = run_validate(config.session_root, check_calibrated=args.check_calibrated)
+		ok = run_validate(
+			config,
+			check_calibrated=args.check_calibrated,
+			require_calibration_toml=args.require_calibration,
+		)
 		return 0 if ok else 1
 
 	return run_from_config(

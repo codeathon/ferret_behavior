@@ -19,6 +19,13 @@ from src.utilities.folder_utilities.calibration_folder import (
 	CalibrationPipelineStep,
 )
 from src.utilities.folder_utilities.recording_folder import BaslerCamera, RecordingFolder
+from src.utilities.folder_utilities.session_paths import (
+	discover_basler_raw_videos_folder,
+	discover_calibration_toml,
+	discover_pupil_info_json,
+	discover_pupil_output_folder,
+	session_has_calibration_videos,
+)
 from src.utilities.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -101,13 +108,34 @@ def _check_path_exists(report: SessionValidationReport, name: str, path: Path | 
 	return True
 
 
-def _validate_calibration_toml(report: SessionValidationReport, toml_path: Path | None) -> None:
+def _missing_calibration_message(session_root: Path) -> str:
+	if session_has_calibration_videos(session_root):
+		return (
+			"calibration videos found but no *camera_calibration.toml yet — "
+			"run full_pipeline with overwrite_calibration=True, or set calibration_toml_path "
+			"in configs/offline_pipeline.json to a prior session on this rig"
+		)
+	return (
+		"no *camera_calibration.toml in this session (normal for trial-only folders) — "
+		"set calibration_toml_path in configs/offline_pipeline.json to a calibrated session, "
+		"or add session/calibration/ videos and run the calibration step"
+	)
+
+
+def _validate_calibration_toml(
+	report: SessionValidationReport,
+	session_root: Path,
+	toml_path: Path | None,
+	*,
+	require_for_triangulation: bool,
+) -> None:
 	if toml_path is None or not toml_path.is_file():
+		level = ValidationLevel.ERROR if require_for_triangulation else ValidationLevel.WARN
 		report.add(
 			"calibration_toml",
-			ValidationLevel.ERROR,
-			"no *camera_calibration.toml under session/calibration/",
-			toml_path,
+			level,
+			_missing_calibration_message(session_root),
+			session_root / "calibration",
 		)
 		return
 
@@ -155,34 +183,62 @@ def _validate_calibration_toml(report: SessionValidationReport, toml_path: Path 
 		)
 
 
+def _pupil_video_path(pupil_output: Path, name: str) -> Path | None:
+	"""Return first existing ``name*.mp4`` under a pupil export folder."""
+	exact = pupil_output / f"{name}.mp4"
+	if exact.is_file():
+		return exact
+	matches = sorted(pupil_output.glob(f"{name}*.mp4"))
+	return matches[0] if matches else None
+
+
 def _validate_raw_inputs(report: SessionValidationReport, recording: RecordingFolder) -> None:
-	mocap_raw = recording.mocap_data / "raw_videos"
-	if _check_path_exists(report, "mocap_raw_videos", mocap_raw if mocap_raw.exists() else None):
+	session_root = recording.base_recordings_folder
+
+	# Basler raw capture lives under base_data/raw_videos in the current layout.
+	mocap_raw = discover_basler_raw_videos_folder(session_root)
+	if _check_path_exists(report, "mocap_raw_videos", mocap_raw):
 		ts_map = mocap_raw / "timestamp_mapping.json"
 		_check_path_exists(report, "basler_timestamp_mapping", ts_map if ts_map.exists() else None)
 
-	eye_videos = recording.eye_videos
-	if _check_path_exists(report, "eye_videos", eye_videos):
-		for label, path in {
-			"left_eye_video": recording.left_eye_video,
-			"right_eye_video": recording.right_eye_video,
-			"pupil_world_video": recording.pupil_world_video,
-		}.items():
-			_check_path_exists(report, label, path)
+	# Pupil exports: canonical path is session/base_data/pupil_output.
+	pupil_output = discover_pupil_output_folder(session_root)
+	if pupil_output is not None:
+		report.add("pupil_output_folder", ValidationLevel.INFO, "found", pupil_output)
+	else:
+		report.add(
+			"pupil_output_folder",
+			ValidationLevel.WARN,
+			"base_data/pupil_output not found (expected before sync)",
+			session_root / "base_data" / "pupil_output",
+		)
 
-	pupil_info = recording.eye_data / "info.player.json"
-	if not pupil_info.exists():
-		pupil_export = recording.base_recordings_folder / "pupil_output" / "info.player.json"
-		pupil_info = pupil_export if pupil_export.exists() else pupil_info
-	if pupil_info.exists():
+	pupil_info = discover_pupil_info_json(session_root)
+	if pupil_info is not None:
 		report.add("pupil_timestamp_mapping", ValidationLevel.INFO, "found", pupil_info)
 	else:
 		report.add(
 			"pupil_timestamp_mapping",
 			ValidationLevel.WARN,
-			"info.player.json not found (needed if sync step not yet run)",
-			pupil_info,
+			"info.player.json / info.json not found under base_data/pupil_output",
+			session_root / "base_data" / "pupil_output" / "info.player.json",
 		)
+
+	# Eye videos may be in full_recording (post-sync) or still in base_data/pupil_output.
+	left_fallback = _pupil_video_path(pupil_output, recording.left_eye_name) if pupil_output else None
+	right_fallback = _pupil_video_path(pupil_output, recording.right_eye_name) if pupil_output else None
+	world_fallback = _pupil_video_path(pupil_output, "world") if pupil_output else None
+	eye_sources: list[tuple[str, Path | None]] = [
+		("left_eye_video", recording.left_eye_video or left_fallback),
+		("right_eye_video", recording.right_eye_video or right_fallback),
+		("pupil_world_video", recording.pupil_world_video or world_fallback),
+	]
+
+	for label, path in eye_sources:
+		if path is not None and path.is_file():
+			_check_path_exists(report, label, path)
+		else:
+			report.add(label, ValidationLevel.WARN, "not found in eye_videos or base_data/pupil_output", path)
 
 
 def _validate_pipeline_stage(
@@ -235,6 +291,8 @@ def _validate_pipeline_stage(
 def validate_session(
 	session_input: Path,
 	*,
+	calibration_toml_path: Path | None = None,
+	require_calibration_toml: bool = False,
 	check_sync: bool = True,
 	check_calibrated: bool = False,
 ) -> SessionValidationReport:
@@ -258,7 +316,13 @@ def validate_session(
 
 	report.add("recording_folder", ValidationLevel.INFO, "layout OK", full_recording)
 	_validate_raw_inputs(report, recording)
-	_validate_calibration_toml(report, recording.calibration_toml_path)
+	resolved_toml = discover_calibration_toml(session_root, calibration_toml_path)
+	_validate_calibration_toml(
+		report,
+		session_root,
+		resolved_toml,
+		require_for_triangulation=require_calibration_toml,
+	)
 	_validate_pipeline_stage(
 		report,
 		recording,
