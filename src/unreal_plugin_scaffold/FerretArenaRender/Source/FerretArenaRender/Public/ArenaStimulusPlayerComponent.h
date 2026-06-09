@@ -4,11 +4,14 @@
 #include "Components/ActorComponent.h"
 #include "Dom/JsonValue.h"
 #include "ArenaWallMaterialBinding.h"
+#include "Materials/MaterialInstanceDynamic.h"
 #include "ArenaStimulusPlayerComponent.generated.h"
+
+class UPrimitiveComponent;
 
 /**
  * Offline wall-stimulus playback from stimulus_timeline.json + wall_textures/.
- * Arena-only scope: no ferret pose or ZMQ.
+ * Offline arena playback: wall textures plus optional merged skull/gaze pose.
  */
 UCLASS(ClassGroup = (FerretArena), meta = (BlueprintSpawnableComponent))
 class FERRETARENARENDER_API UArenaStimulusPlayerComponent : public UActorComponent
@@ -45,6 +48,23 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "FerretArena", meta = (ClampMin = "1.0"))
 	float PlaybackFps = 90.0f;
 
+	// Advance frames automatically after manifest load (calls Play()).
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "FerretArena")
+	bool bAutoPlayOnLoad = true;
+
+	// Offline pose from merged timeline (skull + gaze blocks per frame).
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "FerretArena|Pose")
+	TObjectPtr<AActor> SkullActor = nullptr;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "FerretArena|Pose")
+	bool bApplyPoseFromTimeline = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "FerretArena|Pose")
+	bool bDrawGazeDebug = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "FerretArena|Pose", meta = (ClampMin = "1.0"))
+	float GazeDebugLengthCm = 30.0f;
+
 	UPROPERTY(BlueprintReadOnly, Category = "FerretArena")
 	int32 CurrentFrameIndex = 0;
 
@@ -57,10 +77,17 @@ public:
 private:
 	bool LoadTimelineJson(const FString& TimelineAbsolutePath);
 	bool ApplyFrameTextures(int32 FrameIndex);
+	bool ApplyFramePose(int32 FrameIndex);
 	FString ResolveTexturePath(const FString& RelativePath) const;
+	UMaterialInstanceDynamic* ResolveWallMaterialDynamic(int32 BindingIndex);
 
 private:
 	FString TextureRoot;
 	TArray<TSharedPtr<FJsonValue>> TimelineFrames;
+	TArray<TObjectPtr<UMaterialInstanceDynamic>> CachedWallMaterialDynamics;
 	float PlaybackAccumulator = 0.0f;
+	bool bPendingManifestLoad = false;
+
+	UPrimitiveComponent* ResolveWallMesh(const FArenaWallMaterialBinding& Binding) const;
+	void TryAutoLoadManifest();
 };

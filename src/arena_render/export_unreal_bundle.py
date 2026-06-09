@@ -17,6 +17,7 @@ import toml
 
 from src.arena_render.arena_config import ArenaRenderGeometry
 from src.arena_render.session_inputs import resolve_arena_session_inputs
+from src.arena_render.timeline_exporter import merge_pose_into_timeline, write_stimulus_timeline
 from src.utilities.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -35,6 +36,21 @@ def _estimate_fps(sync_video_dir: Path) -> float:
 	delta_ns = int(timestamps[1]) - int(timestamps[0])
 	if delta_ns <= 0:
 		return 90.0
+	return float(1e9 / delta_ns)
+
+
+def _estimate_fps_from_timeline(timeline: dict) -> float | None:
+	"""Fallback fps when sync videos are unavailable (e.g. Mac-only texture export)."""
+	frames = timeline.get("frames", [])
+	if len(frames) < 2:
+		return None
+	t0 = frames[0].get("timestamp_utc_ns")
+	t1 = frames[1].get("timestamp_utc_ns")
+	if t0 is None or t1 is None:
+		return None
+	delta_ns = int(t1) - int(t0)
+	if delta_ns <= 0:
+		return None
 	return float(1e9 / delta_ns)
 
 
@@ -75,39 +91,72 @@ def _wall_export_cm(geometry: ArenaRenderGeometry) -> list[dict]:
 
 
 def build_unreal_arena_manifest(
-	session_root: Path,
+	session_root: Path | None,
 	geometry_path: Path,
 	*,
+	arena_render_dir: Path | None = None,
 	calibration_toml_path: Path | None = None,
+	playback_fps: float | None = None,
 ) -> dict:
 	"""Assemble manifest dict for FerretArenaRender plugin."""
-	inputs = resolve_arena_session_inputs(session_root, calibration_toml_path=calibration_toml_path)
 	geometry = ArenaRenderGeometry.from_json_file(geometry_path)
-	arena_render_dir = inputs.full_recording / "arena_render"
-	timeline_path = arena_render_dir / "stimulus_timeline.json"
-	texture_root = arena_render_dir / "wall_textures"
+	cameras: list[dict] = []
+	resolved_fps = playback_fps
+
+	if arena_render_dir is not None:
+		# Mac/local export: textures + timeline copied without full session tree.
+		arena_render_dir = arena_render_dir.resolve()
+		timeline_path = arena_render_dir / "stimulus_timeline.json"
+		texture_root = arena_render_dir / "wall_textures"
+		manifest_session_root = session_root.resolve() if session_root is not None else arena_render_dir
+		if calibration_toml_path is not None and calibration_toml_path.is_file():
+			cameras = _export_cameras_cm(calibration_toml_path)
+		else:
+			logger.warning(
+				"No calibration TOML on this machine; manifest cameras[] will be empty. "
+				"Pass --calibration-toml after rsyncing the file from the lab."
+			)
+	else:
+		if session_root is None:
+			raise ValueError("Either session_root or arena_render_dir is required")
+		inputs = resolve_arena_session_inputs(session_root, calibration_toml_path=calibration_toml_path)
+		arena_render_dir = inputs.full_recording / "arena_render"
+		timeline_path = arena_render_dir / "stimulus_timeline.json"
+		texture_root = arena_render_dir / "wall_textures"
+		manifest_session_root = inputs.session_root
+		if inputs.calibration_toml.is_file():
+			cameras = _export_cameras_cm(inputs.calibration_toml)
+		if resolved_fps is None:
+			resolved_fps = _estimate_fps(inputs.sync_video_dir)
+
 	if not timeline_path.is_file():
 		raise FileNotFoundError(f"Missing timeline: {timeline_path}")
 	if not texture_root.is_dir():
 		raise FileNotFoundError(f"Missing textures: {texture_root}")
 
 	timeline = json.loads(timeline_path.read_text(encoding="utf-8"))
+	if resolved_fps is None:
+		resolved_fps = _estimate_fps_from_timeline(timeline) or 90.0
+
 	arena_mm = geometry.arena_mm
+	manifest_version = 2 if timeline.get("has_pose") else 1
 	return {
-		"version": 1,
-		"session_root": str(inputs.session_root),
+		"version": manifest_version,
+		"session_root": str(manifest_session_root),
 		"texture_root": str(texture_root.resolve()),
 		"timeline_json": str(timeline_path.resolve()),
 		"frame_count": timeline.get("frame_count", 0),
 		"walls": timeline.get("walls", [wall.id for wall in geometry.walls]),
-		"playback_fps": _estimate_fps(inputs.sync_video_dir),
+		"playback_fps": resolved_fps,
 		"units": "cm",
 		"arena": {
 			"center_cm": [v * MM_TO_CM for v in arena_mm.center],
 			"half_size_cm": [v * MM_TO_CM for v in arena_mm.half_size],
 		},
 		"wall_screens": _wall_export_cm(geometry),
-		"cameras": _export_cameras_cm(inputs.calibration_toml),
+		"cameras": cameras,
+		"has_pose": bool(timeline.get("has_pose")),
+		"pose_units": timeline.get("pose_units", "cm"),
 	}
 
 
@@ -120,7 +169,13 @@ def write_unreal_arena_manifest(manifest: dict, output_path: Path) -> Path:
 
 def main(argv: list[str] | None = None) -> int:
 	parser = argparse.ArgumentParser(description="Export Unreal arena manifest from session outputs")
-	parser.add_argument("--session", type=Path, required=True, help="Session root path")
+	parser.add_argument("--session", type=Path, default=None, help="Lab session root path")
+	parser.add_argument(
+		"--arena-render-dir",
+		type=Path,
+		default=None,
+		help="Local arena_render folder (textures + stimulus_timeline.json)",
+	)
 	parser.add_argument(
 		"--geometry",
 		type=Path,
@@ -128,31 +183,71 @@ def main(argv: list[str] | None = None) -> int:
 		help="arena_geometry.json (default: session/arena_geometry.json)",
 	)
 	parser.add_argument("--calibration-toml", type=Path, default=None)
+	parser.add_argument("--playback-fps", type=float, default=None)
+	parser.add_argument(
+		"--analyzable-output",
+		type=Path,
+		default=None,
+		help="Merge skull+gaze from analyzable_output/ before writing manifest",
+	)
 	parser.add_argument(
 		"--output",
 		type=Path,
 		default=None,
-		help="Output path (default: full_recording/arena_render/unreal_arena_manifest.json)",
+		help="Output path (default: arena_render/unreal_arena_manifest.json)",
 	)
 	args = parser.parse_args(argv)
 
-	session_root = args.session.resolve()
-	geometry_path = args.geometry or (session_root / "arena_geometry.json")
-	if not geometry_path.is_file():
+	if args.session is None and args.arena_render_dir is None:
+		print("Provide --session (lab) or --arena-render-dir (local Mac copy)", file=sys.stderr)
+		return 1
+
+	session_root = args.session.resolve() if args.session is not None else None
+	arena_render_dir = args.arena_render_dir.resolve() if args.arena_render_dir is not None else None
+	geometry_path = args.geometry or (
+		(session_root / "arena_geometry.json") if session_root is not None else None
+	)
+	if geometry_path is None or not geometry_path.is_file():
 		print(f"Geometry not found: {geometry_path}", file=sys.stderr)
 		return 1
 
 	try:
+		if args.analyzable_output is not None:
+			if arena_render_dir is None:
+				arena_render_dir = (
+					session_root / "full_recording" / "arena_render"
+					if session_root is not None
+					else None
+				)
+			if arena_render_dir is None:
+				print("--arena-render-dir or --session required with --analyzable-output", file=sys.stderr)
+				return 1
+			timeline_path = arena_render_dir / "stimulus_timeline.json"
+			if not timeline_path.is_file():
+				print(f"Missing timeline: {timeline_path}", file=sys.stderr)
+				return 1
+			timeline = json.loads(timeline_path.read_text(encoding="utf-8"))
+			timeline = merge_pose_into_timeline(timeline, args.analyzable_output.resolve())
+			write_stimulus_timeline(timeline, timeline_path)
+			logger.info("Pose merged into %s", timeline_path)
+
 		manifest = build_unreal_arena_manifest(
 			session_root,
 			geometry_path,
+			arena_render_dir=arena_render_dir,
 			calibration_toml_path=args.calibration_toml,
+			playback_fps=args.playback_fps,
 		)
-	except (FileNotFoundError, RuntimeError) as exc:
+	except (FileNotFoundError, RuntimeError, ValueError) as exc:
 		print(exc, file=sys.stderr)
 		return 1
 
-	output = args.output or (session_root / "full_recording" / "arena_render" / "unreal_arena_manifest.json")
+	if args.output is not None:
+		output = args.output
+	elif arena_render_dir is not None:
+		output = arena_render_dir / "unreal_arena_manifest.json"
+	else:
+		output = session_root / "full_recording" / "arena_render" / "unreal_arena_manifest.json"
 	write_unreal_arena_manifest(manifest, output.resolve())
 	return 0
 
