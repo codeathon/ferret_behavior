@@ -1,0 +1,20 @@
+{
+	"FileVersion": 3,
+	"Version": 1,
+	"VersionName": "0.1.0",
+	"FriendlyName": "Ferret Arena Render (UE 5.7)",
+	"Description": "Offline arena wall-stimulus playback from stimulus_timeline.json.",
+	"Category": "Runtime",
+	"CreatedBy": "bs",
+	"EngineVersion": "5.7.0",
+	"CanContainContent": false,
+	"IsBetaVersion": true,
+	"Installed": false,
+	"Modules": [
+		{
+			"Name": "FerretArenaRender",
+			"Type": "Runtime",
+			"LoadingPhase": "Default"
+		}
+	]
+}

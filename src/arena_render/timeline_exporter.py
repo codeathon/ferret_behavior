@@ -1,7 +1,8 @@
 """
 Export a per-frame stimulus timeline for Unreal/Blender arena scenes.
 
-References extracted wall texture paths keyed by frame index; no ferret pose.
+References extracted wall texture paths keyed by frame index. Optional skull/gaze
+pose blocks are merged from analyzable_output when requested.
 """
 
 from __future__ import annotations
@@ -12,7 +13,11 @@ from pathlib import Path
 import numpy as np
 
 from src.arena_render.arena_config import ArenaRenderGeometry
+from src.arena_render.kinematics_timeline_loader import load_offline_pose_arrays, pose_dict_for_frame
 from src.arena_render.session_inputs import ArenaSessionInputs
+from src.utilities.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 def _relative_path(path: Path, base: Path) -> str:
@@ -59,6 +64,49 @@ def build_stimulus_timeline(
 		"walls": [wall.id for wall in geometry.walls],
 		"frames": frames,
 	}
+
+
+def merge_pose_into_timeline(
+	timeline: dict,
+	analyzable_output_dir: Path,
+) -> dict:
+	"""
+	Attach per-frame skull pose and binocular gaze to an existing wall timeline.
+
+	Uses each frame's ``frame_index`` to index mocap kinematics CSV rows.
+	"""
+	pose = load_offline_pose_arrays(analyzable_output_dir)
+	merged_frames: list[dict] = []
+	missing_pose = 0
+	for frame in timeline.get("frames", []):
+		frame_index = int(frame["frame_index"])
+		merged = dict(frame)
+		pose_block = pose_dict_for_frame(pose, frame_index)
+		if pose_block is None:
+			missing_pose += 1
+		else:
+			merged.update(pose_block)
+		merged_frames.append(merged)
+
+	if missing_pose:
+		logger.warning(
+			"%d timeline frames had no pose (mocap has %d frames)",
+			missing_pose,
+			pose.frame_count,
+		)
+
+	timeline = dict(timeline)
+	timeline["frames"] = merged_frames
+	timeline["has_pose"] = True
+	timeline["pose_units"] = "cm"
+	timeline["analyzable_output"] = str(analyzable_output_dir.resolve())
+	timeline["mocap_frame_count"] = pose.frame_count
+	logger.info(
+		"Merged pose into %d timeline frames from %s",
+		len(merged_frames),
+		analyzable_output_dir,
+	)
+	return timeline
 
 
 def write_stimulus_timeline(

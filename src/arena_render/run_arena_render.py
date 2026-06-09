@@ -11,6 +11,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from pathlib import Path
 
@@ -18,8 +19,13 @@ from src.arena_render.arena_config import ArenaRenderGeometry, default_geometry_
 from src.arena_render.pipeline_config import ArenaRenderConfig, default_config_path, load_arena_render_config
 from src.arena_render.rerun_arena_viewer import launch_arena_rerun_viewer
 from src.arena_render.session_inputs import resolve_arena_session_inputs
-from src.arena_render.timeline_exporter import build_stimulus_timeline, write_stimulus_timeline
+from src.arena_render.timeline_exporter import (
+	build_stimulus_timeline,
+	merge_pose_into_timeline,
+	write_stimulus_timeline,
+)
 from src.arena_render.validate_arena import print_validation_report, validate_arena_session
+from src.arena_render.export_unreal_bundle import build_unreal_arena_manifest, write_unreal_arena_manifest
 from src.arena_render.wall_texture_extractor import extract_wall_textures_for_session
 from src.cameras.postprocess import postprocess
 from src.utilities.logging_config import get_logger
@@ -117,6 +123,66 @@ def cmd_extract_textures(config: ArenaRenderConfig) -> int:
 	return 0
 
 
+def cmd_export_unreal_bundle(config: ArenaRenderConfig) -> int:
+	session_root = config.session_root.resolve() if config.session_root is not None else None
+	output_dir = config.output_dir
+	if output_dir is None and session_root is not None:
+		output_dir = _default_output_dir(session_root)
+
+	if output_dir is not None and (output_dir / "stimulus_timeline.json").is_file():
+		geometry_path = config.geometry_path
+		if geometry_path is None and session_root is not None:
+			geometry_path = session_root / "arena_geometry.json"
+		if geometry_path is None or not geometry_path.is_file():
+			logger.error("geometry JSON required for export (--geometry or session/arena_geometry.json)")
+			return 1
+		manifest = build_unreal_arena_manifest(
+			session_root,
+			geometry_path,
+			arena_render_dir=output_dir,
+			calibration_toml_path=config.calibration_toml_path,
+		)
+		manifest_path = write_unreal_arena_manifest(manifest, output_dir / "unreal_arena_manifest.json")
+	else:
+		if session_root is None:
+			logger.error("--session or output_dir with arena_render outputs is required")
+			return 1
+		_resolve_geometry(config, session_root)
+		geometry_path = config.geometry_path or (session_root / "arena_geometry.json")
+		manifest = build_unreal_arena_manifest(
+			session_root,
+			geometry_path,
+			calibration_toml_path=config.calibration_toml_path,
+		)
+		manifest_path = write_unreal_arena_manifest(
+			manifest,
+			(output_dir or _default_output_dir(session_root)) / "unreal_arena_manifest.json",
+		)
+
+	logger.info("Unreal manifest ready: %s", manifest_path)
+	return 0
+
+
+def cmd_merge_pose_timeline(config: ArenaRenderConfig, analyzable_output_dir: Path) -> int:
+	"""Merge skull/gaze pose from analyzable_output into an existing stimulus_timeline.json."""
+	output_dir = config.output_dir
+	if output_dir is None:
+		if config.session_root is not None:
+			output_dir = _default_output_dir(config.session_root)
+		else:
+			output_dir = Path(__file__).resolve().parents[1] / "arena_render"
+	timeline_path = output_dir / "stimulus_timeline.json"
+	if not timeline_path.is_file():
+		logger.error("Missing timeline: %s (run extract-textures first)", timeline_path)
+		return 1
+
+	timeline = json.loads(timeline_path.read_text(encoding="utf-8"))
+	timeline = merge_pose_into_timeline(timeline, analyzable_output_dir)
+	write_stimulus_timeline(timeline, timeline_path)
+	logger.info("Wrote pose-merged timeline: %s", timeline_path)
+	return 0
+
+
 def build_arg_parser() -> argparse.ArgumentParser:
 	parser = argparse.ArgumentParser(description="Offline arena virtual render pipeline")
 	parser.add_argument("--config", type=Path, default=None, help="JSON config path")
@@ -133,8 +199,21 @@ def build_arg_parser() -> argparse.ArgumentParser:
 	parser.add_argument("--max-frames", type=int, default=None)
 	parser.add_argument("--preview-frame", type=int, default=0, help="Frame for Rerun texture preview")
 	parser.add_argument(
+		"--analyzable-output",
+		type=Path,
+		default=None,
+		help="Path to session analyzable_output/ for skull+gaze merge",
+	)
+	parser.add_argument(
 		"command",
-		choices=("validate", "sync", "rerun", "extract-textures"),
+		choices=(
+			"validate",
+			"sync",
+			"rerun",
+			"extract-textures",
+			"merge-pose-timeline",
+			"export-unreal-bundle",
+		),
 		help="Pipeline step to run",
 	)
 	return parser
@@ -157,7 +236,13 @@ def main(argv: list[str] | None = None) -> int:
 	if args.max_frames is not None:
 		config.max_frames = args.max_frames
 
-	if config.session_root is None:
+	if args.command == "merge-pose-timeline":
+		if args.analyzable_output is None:
+			logger.error("--analyzable-output is required for merge-pose-timeline")
+			return 1
+		return cmd_merge_pose_timeline(config, args.analyzable_output.resolve())
+
+	if config.session_root is None and args.command != "export-unreal-bundle":
 		logger.error("--session or session_root in config is required")
 		return 1
 
@@ -169,6 +254,8 @@ def main(argv: list[str] | None = None) -> int:
 		return cmd_rerun(config, preview_frame=args.preview_frame)
 	if args.command == "extract-textures":
 		return cmd_extract_textures(config)
+	if args.command == "export-unreal-bundle":
+		return cmd_export_unreal_bundle(config)
 	return 1
 
 

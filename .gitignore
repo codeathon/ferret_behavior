@@ -173,3 +173,11 @@ CLAUDE.md
 # Repo-wide `lib/` ignores Python eggs; allow Unreal plugin vendored static libs.
 !src/unreal_plugin_scaffold/FerretGazeLive/ThirdParty/lib/
 !src/unreal_plugin_scaffold/FerretGazeLive/ThirdParty/lib/**/*
+
+# Arena render: per-frame wall texture crops (extract-textures output; many GB)
+src/arena_render/wall_textures/
+
+# Local session kinematics + generated Unreal export artifacts
+data/
+src/arena_render/stimulus_timeline.json
+src/arena_render/unreal_arena_manifest.json
