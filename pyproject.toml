@@ -33,6 +33,7 @@ dependencies = [
     # Changed from 2.8.0 - CUDA wheels don't have 2.8.0 yet
     "torch>=2.11.0",
     "tqdm>=4.67.1",
+    "zaber-motion>=7.0.0",
 ]
 
 [dependency-groups]

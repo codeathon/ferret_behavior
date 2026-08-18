@@ -67,6 +67,7 @@ uv run python -c "import cv2, torch, pandas, rerun; print('OK')"
 | `src/cameras/` | Basler multicamera acquisition, UTC timestamp sync, Pupil alignment, intrinsics calibration, and session postprocessing. Internally split into focused modules: `camera_config.py` (hardware config), `video_writers.py` (ffmpeg/OpenCV writers), `timestamp_utils.py` (latch/save), `grab_loops.py` (frame loop). Run a session via `run_recording.py`. |
 | `src/video_viewing/` | Composite multi-camera video assembly, session clipping, and rotation/flip layout config. |
 | `src/eye_analysis/` | DLC eye trajectory loading, anatomical alignment, stabilized video export, and Plotly dashboards. |
+| `src/hunt/` | Open-loop Zaber XXY gantry prey control: coverage + corner-flee stress (`scripts/run_prey_move.py`), timing benches. No camera coupling. |
 | `src/rigid_body_solver/` | Ceres-based rigid body fitting to 3D markers; outputs skull kinematics and reference geometry JSON. |
 | `src/ferret_gaze/` | Full gaze pipeline: eye kinematics → resampling → gaze computation → Rerun/Blender visualization. Each stage is idempotent. |
 | `src/rerun_viewer/` | Rerun viewer apps for interactive inspection of videos, 3D markers, gaze, and eye traces at any pipeline stage. |
@@ -77,6 +78,29 @@ uv run python -c "import cv2, torch, pandas, rerun; print('OK')"
 ---
 
 ## 5. How to run each workflow
+
+### Zaber gantry prey (open-loop)
+
+Edit `configs/hunt_experiment.json` (serial port, workspace mm, speeds). Dry-run without hardware:
+
+```bash
+uv run python scripts/run_prey_move.py --config configs/hunt_experiment.json --dry-run
+```
+
+Fake motion (no serial) for a short soak:
+
+```bash
+uv run python scripts/run_prey_move.py --fake --min-run-s 5 --no-home
+```
+
+Real gantry (after setting `port` / axes; set `axis_x2` if XXY lockstep):
+
+```bash
+uv run python scripts/run_prey_move.py --config configs/hunt_experiment.json
+uv run python scripts/run_hunt_timing_bench.py --config configs/hunt_experiment.json
+```
+
+Logs land under `data/hunt_logs/` (gitignored).
 
 ### Multicamera recording
 Edit the `CONFIG` section at the top of `run_recording.py` (set `RECORDING_NAME`, `FPS`, `BINNING_FACTOR`, etc.), uncomment one grab mode, then run:
